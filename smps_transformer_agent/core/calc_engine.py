@@ -227,7 +227,7 @@ def calculate(inp: DesignInput, core: CoreData, ic: ICData) -> DesignResult:
     r = DesignResult()
 
     # ── Basic parameters ──
-    pout_total = sum(o.voltage * o.current_ma / 1000.0 for o in inp.outputs)
+    pout_total = sum(abs(o.voltage) * o.current_ma / 1000.0 for o in inp.outputs)
     # Use first output as main for turns ratio
     main_out = inp.outputs[0]
     vd_f = 0.9  # diode forward voltage (typical, could be per-output)

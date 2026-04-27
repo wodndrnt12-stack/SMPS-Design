@@ -43,6 +43,8 @@ st.caption("LLM/API 불필요 | 순수 계산 엔진 | 2안 시트 수식 기반
 if "outputs" not in st.session_state:
     st.session_state.outputs = [
         {"name": "PV15", "voltage": 15.0, "current_ma": 200.0, "isolated": False, "ns_set": 10, "wire_dia": 0.3},
+        {"name": "NV15", "voltage": -15.0, "current_ma": 10.0, "isolated": False, "ns_set": 10, "wire_dia": 0.3},
+        {"name": "IPV24", "voltage": 24.0, "current_ma": 180.0, "isolated": True, "ns_set": 14, "wire_dia": 0.3},
     ]
 if "calculated" not in st.session_state:
     st.session_state.calculated = False
@@ -86,7 +88,7 @@ edited_out = st.data_editor(
 # Sync back
 st.session_state.outputs = edited_out.to_dict("records")
 
-pout_total = sum(o["voltage"] * o["current_ma"] / 1000.0 for o in st.session_state.outputs)
+pout_total = sum(abs(o["voltage"]) * o["current_ma"] / 1000.0 for o in st.session_state.outputs)
 st.metric("Total Output Power", f"{pout_total:.2f} W")
 
 st.divider()
@@ -134,7 +136,7 @@ with col_right:
 
     st.markdown("**MOSFET**")
     vds_rating = st.number_input("VDS Rating (V)", value=1500.0, step=100.0, key="vds_rating")
-    v_spike = st.number_input("V Spike Margin (V)", value=150.0, min_value=50.0, max_value=300.0, step=10.0, key="vspike")
+    v_spike = st.number_input("V Spike Margin (V)", value=200.0, min_value=50.0, max_value=300.0, step=10.0, key="vspike")
 
 st.divider()
 
@@ -179,7 +181,7 @@ st.divider()
 st.markdown('<div class="section-header">Lp 설정</div>', unsafe_allow_html=True)
 col_lp1, col_lp2 = st.columns(2)
 with col_lp1:
-    lp_mode = st.radio("Lp.set 방식", ["Auto (10uH 올림)", "Auto (50uH 올림)", "Manual"], horizontal=True, key="lp_mode")
+    lp_mode = st.radio("Lp.set 방식", ["Auto (10uH 올림)", "Auto (50uH 올림)", "Manual"], index=1, horizontal=True, key="lp_mode")
 with col_lp2:
     lp_manual = st.number_input("Lp.set Manual (uH)", value=1050.0, step=10.0, key="lp_manual", disabled=(lp_mode != "Manual"))
 

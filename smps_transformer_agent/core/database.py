@@ -91,7 +91,7 @@ IC_DB: dict[str, ICData] = {
         duty_max=50.0,
         fsw=60.0,
         fsw_fixed=True,
-        ocp_voltage=1.0,
+        ocp_voltage=2.0,
         vds_max_rating=0,  # external MOSFET
         note="ROHM Flyback Controller, Duty 20~50%, Fsw 60kHz fixed",
     ),

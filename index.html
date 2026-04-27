@@ -1,0 +1,1777 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>DCM Flyback Transformer Designer</title>
+<style>
+/* ============================================================
+   DCM Flyback Transformer Designer — Phase 1
+   Based on D2_14 structure, Waveform removed
+   ============================================================ */
+:root {
+  --bg:        #e8ecf2;
+  --white:     #ffffff;
+  --surface:   #f8faff;
+  --border:    #d0daea;
+  --border2:   #b0c4de;
+
+  --hdr:       #1a3560;
+  --hdr2:      #243f72;
+  --sub1:      #2e5fa3;
+  --sub2:      #3a6fbb;
+
+  --text:      #1a2a3a;
+  --dim:       #5a6a80;
+  --dim2:      #8090a8;
+
+  --c-input:   #fffcf0;   --c-input-b: #e8d870; --c-input-t: #4a3800;
+  --c-calc:    #eef5ff;   --c-calc-b:  #a0bce0; --c-calc-t:  #1a3a6a;
+  --c-key:     #fff8e6;   --c-key-b:   #e0b840; --c-key-t:   #5a3a00;
+  --c-pass:    #edfaf3;   --c-pass-b:  #80d0a8; --c-pass-t:  #165a38;
+  --c-fail:    #fff0f0;   --c-fail-b:  #f0a0a0; --c-fail-t:  #8a1010;
+
+  --accent:    #2a6dd9;
+  --don-bg:    #4a90d9;
+  --doff-bg:   #7bc8a0;
+  --dead-bg:   #e8f0f8;
+  --dead-t:    #6a85a8;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); }
+body { font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; color: var(--text); font-size: 12px; }
+
+#app { width: 100vw; min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+
+/* ── Flash Animation ── */
+@keyframes flash-update {
+  0%, 49.9% { box-shadow: inset 0 0 0 200px rgba(40, 200, 80, 0.55); }
+  50%, 100%  { box-shadow: none; }
+}
+.flash { animation: flash-update 2s linear 2; animation-fill-mode: none; }
+
+/* ── Trend Arrows ── */
+.trend-up   { color: #c04820; font-weight: 700; font-size: 9px; }
+.trend-down { color: #2070a0; font-weight: 700; font-size: 9px; }
+.trend-up::after   { content: ' ▲'; }
+.trend-down::after { content: ' ▼'; }
+
+/* ── HEADER ── */
+#hdr {
+  background: linear-gradient(135deg, var(--hdr) 0%, var(--hdr2) 100%);
+  padding: 0 14px; height: 40px;
+  display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(26,53,96,0.3);
+  position: sticky; top: 0; z-index: 100;
+}
+#hdr .brand { display: flex; flex-direction: column; }
+#hdr .title { font-size: 13px; font-weight: 700; color: #e8f0ff; letter-spacing: 0.3px; }
+#hdr .sub   { font-size: 9px; color: #8aabdc; margin-top: 1px; }
+#hdr .divider { width: 1px; height: 22px; background: rgba(255,255,255,0.15); }
+#hdr .meta  { font-size: 10px; color: #8aabdc; }
+.preset-row { margin-left: auto; display: flex; gap: 5px; align-items: center; }
+.preset-row input, .preset-row select {
+  padding: 3px 7px; border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.1);
+  color: #e8f0ff; font-size: 10px;
+  font-family: inherit; outline: none;
+}
+.preset-row select option { background: var(--hdr); color: #e8f0ff; }
+.btn { padding: 3px 9px; border-radius: 3px; font-size: 10px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; }
+.btn-save { background: #ffc000; color: #3a2000; }
+.btn-del  { background: rgba(255,80,80,0.25); color: #ffaaaa; border: 1px solid rgba(255,80,80,0.3); }
+.btn-lib  { background: rgba(100,200,255,0.2); color: #a0d8ff; border: 1px solid rgba(100,200,255,0.3); }
+
+/* ── PAGE 1: MAIN LAYOUT ── */
+#page1 { display: flex; flex-direction: column; height: calc(100vh - 40px); flex-shrink: 0; }
+#top-panels { display: flex; flex: 1; min-height: 0; }
+#left { width: 50%; overflow-y: auto; padding: 8px 10px; border-right: 2px solid var(--border2); background: #f0f4fa; }
+#center { width: 25%; overflow-y: auto; padding: 10px 12px; background: var(--surface); border-right: 1px solid var(--border); }
+#right { width: 25%; overflow-y: auto; padding: 8px 10px; background: var(--surface); }
+#bottom-wire { height: 220px; min-height: 150px; overflow-y: auto; border-top: 2px solid var(--border2); background: var(--white); padding: 0; resize: vertical; }
+
+/* ── TABLE SYSTEM ── */
+.xtable { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 10px; }
+.xtable thead tr.th-main th {
+  background: var(--sub1); color: #ddeeff;
+  padding: 3px 6px; text-align: left; font-size: 10px; font-weight: 600;
+  border: 1px solid var(--sub1); letter-spacing: 0.2px;
+}
+.xtable thead tr.th-col th {
+  background: var(--hdr); color: #8aabdc;
+  padding: 2px 4px; text-align: center; font-size: 8px; font-weight: 400;
+  border: 1px solid #2a4a72; text-transform: uppercase; letter-spacing: 0.3px;
+}
+.xtable tbody td {
+  padding: 2px 5px; border: 1px solid var(--border);
+  vertical-align: middle; background: var(--white);
+}
+.xtable tbody tr:nth-child(even) td { background: #f4f8ff; }
+.xtable tbody tr:hover td { background: #e8f0ff !important; }
+
+.td-lbl  { color: var(--dim); font-size: 9px; min-width: 85px; background: #f0f4fa !important; }
+.td-unit { color: var(--dim2); font-size: 9px; text-align: center; min-width: 30px; background: #f0f4fa !important; font-family: 'Consolas', monospace; }
+.td-inp  { background: var(--c-input) !important; text-align: center; }
+.td-cal  { background: var(--c-calc)  !important; color: var(--c-calc-t); font-weight: 600; font-family: 'Consolas', monospace; text-align: center; }
+.td-key  { background: var(--c-key)   !important; font-weight: 700; font-family: 'Consolas', monospace; text-align: center; }
+.td-pass { background: var(--c-pass)  !important; color: var(--c-pass-t); font-weight: 700; font-family: 'Consolas', monospace; text-align: center; }
+.td-fail { background: var(--c-fail)  !important; color: var(--c-fail-t); font-weight: 700; font-family: 'Consolas', monospace; text-align: center; }
+.td-note { background: #f8f8f8 !important; color: var(--dim); font-size: 8px; }
+
+.xtable input {
+  width: 65px; padding: 1px 3px;
+  border: 1px solid transparent; background: transparent;
+  font-family: 'Consolas', monospace; font-size: 10px;
+  outline: none; color: var(--text); text-align: center;
+}
+.xtable select {
+  width: 90px; padding: 1px 2px;
+  border: 1px solid var(--c-input-b); background: var(--c-input);
+  font-family: 'Consolas', monospace; font-size: 10px;
+  outline: none; color: var(--c-input-t); cursor: pointer;
+}
+.td-inp input { color: var(--c-input-t); border-color: var(--c-input-b); }
+.td-key input { color: var(--c-key-t);   border-color: var(--c-key-b); }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 6px; }
+
+/* ── SECTION BOX ── */
+.section-box { background: var(--white); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; margin-bottom: 8px; }
+.section-title {
+  font-size: 9px; font-weight: 700; color: var(--hdr);
+  text-transform: uppercase; letter-spacing: 0.4px;
+  margin-bottom: 6px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── KPI BADGES & CARDS ── */
+.kpi-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+.kpi {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 3px 10px; min-width: 50px;
+  border-radius: 3px; border: 1px solid;
+  line-height: 1.2;
+}
+.kpi .kn { font-size: 8px; }
+.kpi .kv { font-size: 10px; font-weight: 700; }
+.kpi.pass { background: var(--c-pass); border-color: var(--c-pass-b); color: var(--c-pass-t); }
+.kpi.fail { background: var(--c-fail); border-color: var(--c-fail-b); color: var(--c-fail-t); }
+
+.kpi-cards { display: grid; grid-template-columns: repeat(2,1fr); gap: 4px; margin-bottom: 8px; }
+.kcard {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 4px; padding: 5px 6px;
+  border-top: 2px solid var(--border2);
+  text-align: center;
+}
+.kcard.pass-k { border-top-color: var(--c-pass-b); background: var(--c-pass); }
+.kcard.key-k  { border-top-color: var(--c-key-b); background: #fffdf5; }
+.kcard .kl { font-size: 7px; color: var(--dim); text-transform: uppercase; margin-bottom: 1px; }
+.kcard .kv { font-size: 12px; font-weight: 700; color: var(--hdr); font-family: 'Consolas', monospace; }
+.kcard .ku { font-size: 8px; color: var(--dim); }
+.kcard.pass-k .kv { color: var(--c-pass-t); }
+.kcard.key-k  .kv { color: var(--c-key-t); }
+
+/* ── BARS ── */
+.bar-wrap { background: var(--white); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; margin-bottom: 8px; }
+.bar-title {
+  font-size: 8px; font-weight: 600; color: var(--dim);
+  text-transform: uppercase; margin-bottom: 4px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.dcm-status {
+  font-size: 8px; font-weight: 700; color: var(--c-pass-t);
+  background: var(--c-pass); border: 1px solid var(--c-pass-b);
+  padding: 1px 5px; border-radius: 2px;
+}
+.dcm-status.fail { color: var(--c-fail-t); background: var(--c-fail); border-color: var(--c-fail-b); }
+.duty-bar { display: flex; height: 18px; border-radius: 2px; overflow: hidden; border: 1px solid var(--border2); }
+.duty-seg { display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 700; }
+.duty-seg.don  { background: linear-gradient(135deg, #3a80c9, #5a9ee9); color: white; }
+.duty-seg.doff { background: linear-gradient(135deg, #5ab888, #7cd8a8); color: white; }
+.duty-seg.dead { background: var(--dead-bg); color: var(--dead-t); flex: 1; font-weight: 400; }
+.duty-legend { display: flex; gap: 6px; margin-top: 3px; font-size: 7px; color: var(--dim); }
+.duty-legend span { display: flex; align-items: center; gap: 2px; }
+.dot { width: 6px; height: 6px; border-radius: 1px; display: inline-block; }
+
+.margin-pct { font-size: 10px; font-weight: 700; color: var(--c-pass-t); font-family: 'Consolas', monospace; }
+.margin-pct.fail { color: var(--c-fail-t); }
+.flux-bar { display: flex; height: 16px; border-radius: 2px; overflow: hidden; border: 1px solid var(--border2); }
+.flux-used-seg {
+  background: linear-gradient(90deg, #c04820, #e06848);
+  color: white; font-size: 7px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.flux-margin-seg {
+  background: linear-gradient(90deg, #a8d8b0, #c8e6c9);
+  color: #1a5a28; font-size: 7px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  flex: 1;
+}
+
+/* ── RESULT TABLE ── */
+.result-section { background: var(--white); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+.result-section .section-hdr { background: var(--sub1); color: #ddeeff; padding: 4px 8px; font-size: 9px; font-weight: 600; }
+.result-section .xtable { font-size: 9px; margin: 0; }
+.result-section .td-lbl { font-size: 8px; min-width: 70px; }
+
+/* ── LOSS PANEL (Right 25%) ── */
+.loss-bar-wrap { margin-bottom: 6px; }
+.loss-bar-label { font-size: 8px; color: var(--dim); display: flex; justify-content: space-between; margin-bottom: 2px; }
+.loss-bar-outer { height: 14px; background: #f0f2f5; border-radius: 2px; overflow: hidden; border: 1px solid var(--border); }
+.loss-bar-inner { height: 100%; border-radius: 1px; display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 600; color: white; min-width: 1px; transition: width 0.3s; }
+.loss-mosfet  { background: linear-gradient(90deg, #c04820, #e06040); }
+.loss-diode   { background: linear-gradient(90deg, #d08020, #e0a030); }
+.loss-copper  { background: linear-gradient(90deg, #2070a0, #3090c0); }
+.loss-core    { background: linear-gradient(90deg, #6a3090, #8a50b0); }
+.loss-snubber { background: linear-gradient(90deg, #808080, #a0a0a0); }
+
+.stress-bar-outer { height: 12px; background: #f0f2f5; border-radius: 2px; overflow: hidden; border: 1px solid var(--border); position: relative; }
+.stress-bar-fill { height: 100%; transition: width 0.3s; }
+.stress-bar-fill.safe { background: linear-gradient(90deg, #80c8a0, #a0d8b8); }
+.stress-bar-fill.warn { background: linear-gradient(90deg, #e0b040, #f0c860); }
+.stress-bar-fill.danger { background: linear-gradient(90deg, #d06040, #e08060); }
+.stress-limit-line { position: absolute; top: 0; height: 100%; width: 2px; background: #c04820; }
+
+/* ── PAGE 2: WINDING TABLE ── */
+#page2 { min-height: 100vh; padding: 20px; background: var(--bg); }
+.page-title { font-size: 14px; font-weight: 700; color: var(--hdr); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--sub1); }
+#wire-sec { background: var(--white); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.wire-strip {
+  background: var(--sub1); color: #ddeeff;
+  padding: 6px 12px; font-size: 10px; font-weight: 600;
+  text-transform: uppercase;
+  display: flex; align-items: center; gap: 10px;
+}
+.wire-add { padding: 2px 10px; background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3); color: white; border-radius: 3px; font-size: 9px; cursor: pointer; }
+.wire-add:hover { background: rgba(255,255,255,.25); }
+table.wt { width: 100%; border-collapse: collapse; font-size: 10px; }
+table.wt th { background: var(--hdr); color: #8aabdc; padding: 4px 6px; text-align: center; border: 1px solid #2a4a72; font-size: 9px; font-weight: 500; }
+table.wt td { padding: 4px 6px; text-align: center; border: 1px solid var(--border); background: white; font-family: 'Consolas', monospace; }
+table.wt tr:nth-child(even) td { background: #f4f8ff; }
+.wch  { font-weight: 700; color: var(--hdr); background: #eef3f8 !important; font-family: 'Segoe UI', sans-serif !important; }
+.wui  { background: var(--c-input) !important; }
+.wkey { background: var(--c-key)   !important; font-weight: 700; }
+.wcal { background: var(--c-calc)  !important; color: var(--c-calc-t); font-weight: 600; }
+table.wt input { width: 55px; border: 1px solid; padding: 2px 4px; font-family: 'Consolas', monospace; font-size: 10px; background: transparent; color: inherit; outline: none; }
+.wui  input { border-color: var(--c-input-b); color: var(--c-input-t); }
+.wkey input { border-color: var(--c-key-b);   color: var(--c-key-t); }
+.mp { color: var(--c-pass-t); font-weight: 700; }
+.mf { color: var(--c-fail-t); font-weight: 700; }
+.xbtn { padding: 2px 8px; background: var(--c-fail); color: var(--c-fail-t); border: 1px solid var(--c-fail-b); border-radius: 3px; cursor: pointer; font-size: 9px; }
+.xbtn:hover { background: #ffe0e0; }
+
+/* ── LEGEND BAR ── */
+#legend-bar {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 4px; padding: 8px 14px; margin-top: 12px;
+  display: flex; align-items: center; gap: 12px;
+  font-size: 9px; color: var(--dim);
+}
+.lb-title { font-weight: 600; text-transform: uppercase; margin-right: 4px; }
+.lb-sep { width: 1px; height: 14px; background: var(--border2); margin: 0 4px; }
+.lb { display: inline-flex; align-items: center; gap: 4px; }
+.lb-swatch { display: inline-block; width: 12px; height: 10px; border-radius: 2px; border: 1px solid; }
+
+/* ── MODAL (Library) ── */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 200; align-items: center; justify-content: center; }
+.modal-overlay.active { display: flex; }
+.modal { background: var(--white); border-radius: 8px; padding: 20px; min-width: 500px; max-width: 700px; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
+.modal h3 { font-size: 13px; color: var(--hdr); margin-bottom: 12px; }
+.modal table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 10px; }
+.modal table th { background: var(--hdr); color: #8aabdc; padding: 4px 6px; border: 1px solid #2a4a72; font-size: 9px; }
+.modal table td { padding: 3px 5px; border: 1px solid var(--border); }
+.modal table input { width: 60px; padding: 2px 4px; border: 1px solid var(--border); font-family: 'Consolas', monospace; font-size: 10px; }
+.modal .btn-row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+
+.scroll-hint {
+  position: fixed; bottom: 20px; right: 20px;
+  background: var(--hdr); color: white;
+  padding: 8px 14px; border-radius: 20px;
+  font-size: 10px; cursor: pointer; z-index: 50;
+}
+.scroll-hint:hover { background: var(--sub1); }
+
+/* ── COMPARE MODE (Phase 4) ── */
+.cmp-overlay { display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:250; align-items:center; justify-content:center; }
+.cmp-overlay.active { display:flex; }
+.cmp-panel { background:var(--white); border-radius:8px; padding:16px 20px; width:92vw; max-width:820px; max-height:88vh; overflow-y:auto; box-shadow:0 8px 30px rgba(0,0,0,0.3); }
+.cmp-panel h3 { font-size:13px; color:var(--hdr); margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+.cmp-hdr-row { display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+.cmp-hdr-row label { font-size:10px; font-weight:600; color:var(--dim); }
+.cmp-hdr-row select { padding:3px 8px; border:1px solid var(--border); border-radius:3px; font-size:10px; font-family:inherit; min-width:120px; }
+table.cmp { width:100%; border-collapse:collapse; font-size:10px; }
+table.cmp th { background:var(--hdr); color:#8aabdc; padding:4px 8px; border:1px solid #2a4a72; font-size:9px; font-weight:500; text-align:center; position:sticky; top:0; z-index:1; }
+table.cmp td { padding:3px 6px; border:1px solid var(--border); text-align:center; font-family:'Consolas',monospace; }
+table.cmp tr:nth-child(even) td { background:#f4f8ff; }
+table.cmp .cmp-lbl { text-align:left; font-family:'Segoe UI',sans-serif; color:var(--dim); font-size:9px; background:#f0f4fa !important; min-width:110px; }
+table.cmp .cmp-grp td { background:var(--sub2) !important; color:#ddeeff; font-weight:600; font-size:9px; text-align:left; font-family:'Segoe UI',sans-serif; letter-spacing:0.3px; }
+.cmp-better { background:#edfaf3 !important; color:var(--c-pass-t); font-weight:700; }
+.cmp-worse  { background:#fff0f0 !important; color:var(--c-fail-t); font-weight:700; }
+.cmp-delta  { font-size:9px; color:var(--dim); }
+.cmp-delta.pos { color:#c04820; }
+.cmp-delta.neg { color:#2070a0; }
+.btn-cmp { background:rgba(200,160,255,0.2); color:#c0b0ff; border:1px solid rgba(200,160,255,0.3); }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- HEADER -->
+  <div id="hdr">
+    <div class="brand">
+      <div class="title">DCM Flyback Transformer Design</div>
+      <div class="sub">SMPS Design Tool · v0.01</div>
+    </div>
+    <div class="divider"></div>
+    <div class="meta" id="hdr-meta">EE2020 · 7.47W · 300~850V DC</div>
+    <div class="preset-row">
+      <input type="text" id="preset-name" placeholder="Preset name…" style="width:100px">
+      <select id="preset-select"><option value="">-- Select Preset --</option></select>
+      <button class="btn btn-save" id="btn-preset-save">Save</button>
+      <button class="btn btn-del" id="btn-preset-del">Del</button>
+      <div class="divider"></div>
+      <button class="btn btn-lib" id="btn-lib" onclick="openLibrary()">Library</button>
+      <button class="btn btn-cmp" onclick="openCompare()">Compare</button>
+    </div>
+  </div>
+
+  <!-- PAGE 1: MAIN -->
+  <div id="page1">
+   <div id="top-panels">
+    <!-- LEFT 50% — Input Tables -->
+    <div id="left">
+      <div class="grid2">
+        <!-- Column 1 -->
+        <div>
+          <table class="xtable">
+            <thead>
+              <tr class="th-main"><th colspan="4">① Input Spec</th></tr>
+              <tr class="th-col"><th>Parameter</th><th>Value</th><th>Unit</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="td-lbl">Pout</td>         <td class="td-cal" id="cal-pout">7.47</td>                    <td class="td-unit">W</td><td class="td-note">자동합산</td></tr>
+              <tr><td class="td-lbl">η Efficiency</td> <td class="td-inp"><input id="inp-eff" value="0.8"></td>       <td class="td-unit">—</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">Pin (auto)</td>   <td class="td-cal" id="cal-pin">9.34</td>                     <td class="td-unit">W</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">Vin_Min</td>      <td class="td-inp"><input id="inp-vinmin" value="300"></td>    <td class="td-unit">V</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">Vin_Max</td>      <td class="td-inp"><input id="inp-vinmax" value="850"></td>    <td class="td-unit">V</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">Fsw</td>          <td class="td-inp"><input id="inp-fsw" value="60"></td>       <td class="td-unit">kHz</td><td class="td-note">IC 기준</td></tr>
+              <tr><td class="td-lbl">VD_F</td>         <td class="td-inp"><input id="inp-vdf" value="0.9"></td>      <td class="td-unit">V</td><td class="td-note">1SS355VMTE-17</td></tr>
+            </tbody>
+          </table>
+
+          <table class="xtable">
+            <thead>
+              <tr class="th-main"><th colspan="4">② Core Data</th></tr>
+              <tr class="th-col"><th>Parameter</th><th>Value</th><th>Unit</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="td-lbl">Core</td>            <td class="td-inp"><select id="sel-core"></select></td>    <td class="td-unit">—</td><td class="td-note" id="core-material">PC40</td></tr>
+              <tr><td class="td-lbl">Ae</td>              <td class="td-cal" id="cal-ae">30.5</td>                   <td class="td-unit">mm²</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">AL_zero</td>         <td class="td-cal" id="cal-alzero">1550</td>               <td class="td-unit">nH/N²</td><td class="td-note">Ungapped</td></tr>
+              <tr><td class="td-lbl">Bsat</td>            <td class="td-cal" id="cal-bsat">0.39</td>                 <td class="td-unit">T</td><td class="td-note">@100°C</td></tr>
+              <tr><td class="td-lbl">Bobbin H</td>        <td class="td-cal" id="cal-bobbinh">12.4</td>              <td class="td-unit">mm</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">Air gap ★</td>       <td class="td-key"><input id="inp-airgap" value="0.3"></td><td class="td-unit">mm</td><td class="td-note">≥0.1mm</td></tr>
+              <tr><td class="td-lbl">AL_g (calc)</td>     <td class="td-cal" id="cal-alg">307.29</td>                <td class="td-unit">nH/N²</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">BM_set</td>          <td class="td-inp"><input id="inp-bmset" value="0.3"></td> <td class="td-unit">T</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">ΔB (calc)</td>       <td class="td-cal" id="cal-deltab">0.210</td>              <td class="td-unit">T</td><td class="td-note"></td></tr>
+            </tbody>
+          </table>
+
+          <table class="xtable">
+            <thead>
+              <tr class="th-main"><th colspan="4">Wire & Bobbin</th></tr>
+              <tr class="th-col"><th>Parameter</th><th>Value</th><th>Unit</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="td-lbl">1차측 Wire 직경</td>  <td class="td-inp"><input id="inp-wirebare" value="0.2"></td>  <td class="td-unit">mm</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">피복포함 직경</td>    <td class="td-inp"><input id="inp-wirecoat" value="0.2"></td>   <td class="td-unit">mm</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">보빈 높이</td>        <td class="td-cal" id="cal-bobbinh2">12.4</td>                 <td class="td-unit">mm</td><td class="td-note">Core DB</td></tr>
+              <tr><td class="td-lbl">배리어 높이</td>      <td class="td-inp"><input id="inp-barrier" value="2"></td>      <td class="td-unit">mm</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">권선가능 높이</td>    <td class="td-cal" id="cal-windingh">10.40</td>                 <td class="td-unit">mm</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">최대 권선 턴수</td>   <td class="td-cal" id="cal-maxturns">52</td>                   <td class="td-unit">T</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">전류밀도</td>         <td class="td-inp"><input id="inp-jdensity" value="7"></td>     <td class="td-unit">A/mm²</td><td class="td-note">5~7 권장</td></tr>
+              <tr><td class="td-lbl">코어 둘레</td>        <td class="td-inp"><input id="inp-coreperim" value="24.4"></td> <td class="td-unit">mm</td><td class="td-note">1st layer 기준</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Column 2 -->
+        <div>
+          <table class="xtable">
+            <thead>
+              <tr class="th-main"><th colspan="4">③ Turn Ratio 선정</th></tr>
+              <tr class="th-col"><th>Parameter</th><th>Value</th><th>Unit</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="td-lbl">n 상한 (VDS 보호)</td><td class="td-cal" id="cal-nmax">70.00</td>                <td class="td-unit">—</td><td class="td-note">MOSFET 보호</td></tr>
+              <tr><td class="td-lbl">n 하한 (DCM 조건)</td><td class="td-cal" id="cal-nmin">2.42</td>                 <td class="td-unit">—</td><td class="td-note">DCM 조건</td></tr>
+              <tr><td class="td-lbl">Np ★</td>           <td class="td-key"><input id="inp-np" value="90"></td>       <td class="td-unit">T</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">Ns ★</td>           <td class="td-key"><input id="inp-ns" value="10"></td>       <td class="td-unit">T</td><td class="td-note">Main output</td></tr>
+              <tr><td class="td-lbl">n = Np/Ns</td>      <td class="td-cal" id="cal-n">9.00</td>                     <td class="td-unit">—</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">Vr (Reflected)</td>  <td class="td-cal" id="cal-vr">143.10</td>                  <td class="td-unit">V</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">V_spike</td>         <td class="td-inp"><input id="inp-vspike" value="200"></td>  <td class="td-unit">V</td><td class="td-note">마진</td></tr>
+            </tbody>
+          </table>
+
+          <table class="xtable">
+            <thead>
+              <tr class="th-main"><th colspan="4">④ Lp 선정</th></tr>
+              <tr class="th-col"><th>Parameter</th><th>Value</th><th>Unit</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="td-lbl">Lp [자기적 관점]</td><td class="td-cal" id="cal-lp-mag">1034.84</td>             <td class="td-unit">μH</td><td class="td-note">μ0×Np²×Ae/gap</td></tr>
+              <tr><td class="td-lbl">Lp [에너지 관점]</td><td class="td-cal" id="cal-lp-eng">1034.84</td>             <td class="td-unit">μH</td><td class="td-note">Vin²×D²/(2PinFsw)</td></tr>
+              <tr><td class="td-lbl">Lp_set ★</td>       <td class="td-key"><input id="inp-lp" value="1050"></td>     <td class="td-unit">μH</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">1차측 on Duty</td>   <td class="td-cal" id="cal-don">11.35</td>                  <td class="td-unit">%</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">2차측 on Duty</td>   <td class="td-cal" id="cal-doff">23.80</td>                 <td class="td-unit">%</td><td class="td-note"></td></tr>
+            </tbody>
+          </table>
+
+          <table class="xtable">
+            <thead>
+              <tr class="th-main"><th colspan="4">⑤ 판정</th></tr>
+              <tr class="th-col"><th>Parameter</th><th>Value</th><th>Unit</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="td-lbl">DCM 만족</td>       <td class="td-cal" id="cal-dcm">DCM</td>     <td class="td-unit">—</td><td class="td-pass" id="st-dcm">PASS</td></tr>
+              <tr><td class="td-lbl">Ipeak 전류</td>     <td class="td-cal" id="cal-ipk">0.548</td>   <td class="td-unit">A</td><td class="td-pass" id="st-ipk">PASS</td></tr>
+              <tr><td class="td-lbl">P.set ≥ Pin</td>   <td class="td-cal" id="cal-pset">9.47</td>   <td class="td-unit">W</td><td class="td-pass" id="st-pwr">PASS</td></tr>
+              <tr><td class="td-lbl">VDS_Max</td>        <td class="td-cal" id="cal-vds">1193</td>    <td class="td-unit">V</td><td class="td-pass" id="st-vds">PASS</td></tr>
+              <tr><td class="td-lbl">ΔB ≤ BM_set</td>   <td class="td-cal" id="cal-flux-st">0.210</td><td class="td-unit">T</td><td class="td-pass" id="st-flux">PASS</td></tr>
+            </tbody>
+          </table>
+
+          <table class="xtable">
+            <thead>
+              <tr class="th-main"><th colspan="4">MOSFET</th></tr>
+              <tr class="th-col"><th>Parameter</th><th>Value</th><th>Unit</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="td-lbl">MOSFET</td>      <td class="td-inp"><select id="sel-mosfet"></select></td>           <td class="td-unit">—</td><td class="td-note" id="mosfet-pkg">H2PAK-2</td></tr>
+              <tr><td class="td-lbl">VDS 정격</td>    <td class="td-cal" id="cal-vds-rating">1500</td>                    <td class="td-unit">V</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">VDS 마진</td>     <td class="td-inp"><input id="inp-vds-margin" value="150"></td>     <td class="td-unit">V</td><td class="td-note">디레이팅</td></tr>
+              <tr><td class="td-lbl">VDS 판정기준</td> <td class="td-cal" id="cal-vds-limit">1350</td>                    <td class="td-unit">V</td><td class="td-note">정격-마진</td></tr>
+              <tr><td class="td-lbl">Rds_on</td>       <td class="td-cal" id="cal-rdson">6</td>                           <td class="td-unit">Ω</td><td class="td-note">typ @25°C</td></tr>
+              <tr><td class="td-lbl">R_shunt</td>      <td class="td-inp"><input id="inp-rshunt" value="1"></td>          <td class="td-unit">Ω</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">OCP Threshold</td><td class="td-cal" id="cal-ocp">1.0</td>                           <td class="td-unit">V</td><td class="td-note">IC 기준</td></tr>
+              <tr><td class="td-lbl">Ipk_Limit</td>   <td class="td-cal" id="cal-ipklimit">1.000</td>                    <td class="td-unit">A</td><td class="td-note">OCP/Rshunt</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER 25% — Dashboard -->
+    <div id="center">
+      <div class="section-box">
+        <div class="section-title">Design Check</div>
+        <div class="kpi-badges" id="kpi-badges">
+          <div class="kpi pass" id="badge-dcm"><span class="kn">DCM</span><span class="kv">PASS</span></div>
+          <div class="kpi pass" id="badge-ipk"><span class="kn">Ipeak</span><span class="kv">PASS</span></div>
+          <div class="kpi pass" id="badge-pwr"><span class="kn">Power</span><span class="kv">PASS</span></div>
+          <div class="kpi pass" id="badge-vds"><span class="kn">VDS</span><span class="kv">PASS</span></div>
+          <div class="kpi pass" id="badge-flux"><span class="kn">Flux</span><span class="kv">PASS</span></div>
+        </div>
+      </div>
+
+      <div class="kpi-cards">
+        <div class="kcard key-k"><div class="kl">D_on</div><div class="kv" id="kpi-don">11.35<span class="ku">%</span></div></div>
+        <div class="kcard key-k"><div class="kl">D_off</div><div class="kv" id="kpi-doff">23.80<span class="ku">%</span></div></div>
+        <div class="kcard key-k"><div class="kl">D_sum</div><div class="kv" id="kpi-dsum">35.15<span class="ku">%</span></div></div>
+        <div class="kcard pass-k"><div class="kl">Ipeak</div><div class="kv" id="kpi-ipk">0.548<span class="ku">A</span></div></div>
+        <div class="kcard pass-k"><div class="kl">P_set</div><div class="kv" id="kpi-pset">9.47<span class="ku">W</span></div></div>
+        <div class="kcard pass-k"><div class="kl">VDS_calc</div><div class="kv" id="kpi-vds">1193<span class="ku">V</span></div></div>
+      </div>
+
+      <div class="bar-wrap">
+        <div class="bar-title">
+          <span>DCM Duty Margin</span>
+          <span class="dcm-status" id="dcm-status">DCM ✓ 64.85%</span>
+        </div>
+        <div class="duty-bar" id="duty-bar">
+          <div class="duty-seg don" id="duty-don" style="width:11.35%">11%</div>
+          <div class="duty-seg doff" id="duty-doff" style="width:23.80%">24%</div>
+          <div class="duty-seg dead" id="duty-dead">Dead 65%</div>
+        </div>
+        <div class="duty-legend">
+          <span><span class="dot" style="background:#4a90d9"></span>D_on</span>
+          <span><span class="dot" style="background:#7bc8a0"></span>D_off</span>
+          <span><span class="dot" style="background:#c8d8e8"></span>Dead</span>
+        </div>
+      </div>
+
+      <div class="bar-wrap">
+        <div class="bar-title">
+          <span>Flux Margin (ΔB / BM_set)</span>
+          <span class="margin-pct" id="flux-margin-pct">30.0%</span>
+        </div>
+        <div class="flux-bar">
+          <div class="flux-used-seg" id="flux-used" style="width:70%">ΔB 70%</div>
+          <div class="flux-margin-seg" id="flux-margin">여유 30%</div>
+        </div>
+      </div>
+
+      <div class="result-section">
+        <div class="section-hdr">Lp 계산 비교</div>
+        <table class="xtable" style="margin:0">
+          <thead><tr class="th-col"><th>방식</th><th>값</th><th>단위</th></tr></thead>
+          <tbody>
+            <tr><td class="td-lbl">자기적 관점</td><td class="td-cal" id="res-lpmag">1034.84</td><td class="td-unit">μH</td></tr>
+            <tr><td class="td-lbl">에너지 관점</td><td class="td-cal" id="res-lpeng">1034.84</td><td class="td-unit">μH</td></tr>
+            <tr><td class="td-lbl">Lp_set</td><td class="td-key" id="res-lpset">1050</td><td class="td-unit">μH</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RIGHT 25% — Loss & Stress & Core Verification -->
+    <div id="right">
+      <div class="section-box">
+        <div class="section-title">Loss Breakdown</div>
+        <div id="loss-panel">
+          <div class="loss-bar-wrap">
+            <div class="loss-bar-label"><span>MOSFET Cond (I²Rds)</span><span id="loss-mos-cond-val">0.00 W</span></div>
+            <div class="loss-bar-outer"><div class="loss-bar-inner loss-mosfet" id="loss-mos-cond-bar" style="width:0%"></div></div>
+          </div>
+          <div class="loss-bar-wrap">
+            <div class="loss-bar-label"><span>MOSFET Switch</span><span id="loss-mos-sw-val">0.00 W</span></div>
+            <div class="loss-bar-outer"><div class="loss-bar-inner" id="loss-mos-sw-bar" style="width:0%;background:linear-gradient(90deg,#e06848,#f08868)"></div></div>
+          </div>
+          <div class="loss-bar-wrap">
+            <div class="loss-bar-label"><span>Gate Drive</span><span id="loss-gate-val">0.00 W</span></div>
+            <div class="loss-bar-outer"><div class="loss-bar-inner" id="loss-gate-bar" style="width:0%;background:linear-gradient(90deg,#e89060,#f0a880)"></div></div>
+          </div>
+          <div class="loss-bar-wrap">
+            <div class="loss-bar-label"><span>Diode</span><span id="loss-diode-val">0.00 W</span></div>
+            <div class="loss-bar-outer"><div class="loss-bar-inner loss-diode" id="loss-diode-bar" style="width:0%"></div></div>
+          </div>
+          <div class="loss-bar-wrap">
+            <div class="loss-bar-label"><span>Copper Pri</span><span id="loss-cu-pri-val">0.00 W</span></div>
+            <div class="loss-bar-outer"><div class="loss-bar-inner loss-copper" id="loss-cu-pri-bar" style="width:0%"></div></div>
+          </div>
+          <div class="loss-bar-wrap">
+            <div class="loss-bar-label"><span>Copper Sec</span><span id="loss-cu-sec-val">0.00 W</span></div>
+            <div class="loss-bar-outer"><div class="loss-bar-inner" id="loss-cu-sec-bar" style="width:0%;background:linear-gradient(90deg,#3098c8,#50b8e8)"></div></div>
+          </div>
+          <div class="loss-bar-wrap">
+            <div class="loss-bar-label"><span>Core (Steinmetz)</span><span id="loss-core-val">0.00 W</span></div>
+            <div class="loss-bar-outer"><div class="loss-bar-inner loss-core" id="loss-core-bar" style="width:0%"></div></div>
+          </div>
+          <div class="loss-bar-wrap">
+            <div class="loss-bar-label"><span>Snubber R</span><span id="loss-snub-val">0.00 W</span></div>
+            <div class="loss-bar-outer"><div class="loss-bar-inner" id="loss-snub-bar" style="width:0%;background:linear-gradient(90deg,#a080c0,#c0a0e0)"></div></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:4px 0; border-top:1px solid var(--border); margin-top:4px; font-size:10px; font-weight:700;">
+            <span>Total Loss</span><span id="loss-total-val">0.00 W</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:2px 0; font-size:10px;">
+            <span>예상 η</span><span id="loss-eta-val" style="font-weight:700; color:var(--c-pass-t)">—</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:2px 0; font-size:9px; color:var(--dim);">
+            <span>MOSFET 발열 (Pd)</span><span id="loss-mos-pd-val" style="font-weight:600">— W</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:2px 0; font-size:9px; color:var(--dim);">
+            <span>Tj 추정 (Rth=62°C/W)</span><span id="loss-tj-val" style="font-weight:600">— °C</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-title">Component Stress</div>
+        <div id="stress-panel">
+          <div class="loss-bar-wrap">
+            <div class="loss-bar-label"><span>MOSFET VDS</span><span id="stress-vds-val">— V</span></div>
+            <div class="stress-bar-outer"><div class="stress-bar-fill safe" id="stress-vds-bar" style="width:0%"></div></div>
+          </div>
+          <div class="loss-bar-wrap">
+            <div class="loss-bar-label"><span>Ipeak / Limit</span><span id="stress-ipk-val">— A</span></div>
+            <div class="stress-bar-outer"><div class="stress-bar-fill safe" id="stress-ipk-bar" style="width:0%"></div></div>
+          </div>
+          <div class="loss-bar-wrap">
+            <div class="loss-bar-label"><span>ΔB / BM_set</span><span id="stress-flux-val">— T</span></div>
+            <div class="stress-bar-outer"><div class="stress-bar-fill safe" id="stress-flux-bar" style="width:0%"></div></div>
+          </div>
+          <div id="stress-vrrm-list"></div>
+        </div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-title">Core 검증</div>
+        <table class="xtable" style="margin:0">
+          <tbody>
+            <tr><td class="td-lbl">동작 온도</td><td class="td-inp"><input id="inp-temp" value="25"></td><td class="td-unit">°C</td><td class="td-note"></td></tr>
+            <tr><td class="td-lbl">Bsat @Temp</td><td class="td-cal" id="cal-bsat-temp">0.39</td><td class="td-unit">T</td><td class="td-note">디레이팅</td></tr>
+            <tr><td class="td-lbl">ΔB / Bsat@T</td><td class="td-cal" id="cal-bsat-margin">30.0</td><td class="td-unit">%</td><td class="td-note">실효 마진</td></tr>
+            <tr><td class="td-lbl">Window Util</td><td class="td-cal" id="cal-win-util">—</td><td class="td-unit">%</td><td class="td-note">충진율</td></tr>
+            <tr><td class="td-lbl">Vgs</td><td class="td-inp"><input id="inp-vgs" value="10"></td><td class="td-unit">V</td><td class="td-note">Gate drive</td></tr>
+            <tr><td class="td-lbl">Rg</td><td class="td-inp"><input id="inp-rg" value="4.7"></td><td class="td-unit">Ω</td><td class="td-note">Gate resistor</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-box">
+        <div class="section-title">RCD Snubber (R∥C + D)</div>
+        <table class="xtable" style="margin:0">
+          <thead>
+            <tr class="th-col"><th>Parameter</th><th>Value</th><th>Unit</th><th>Note</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="td-lbl">Llk 비율</td><td class="td-inp"><input id="inp-llk-pct" value="1"></td><td class="td-unit">%</td><td class="td-note">Lp 대비</td></tr>
+            <tr><td class="td-lbl">Llk</td><td class="td-cal" id="cal-llk">—</td><td class="td-unit">μH</td><td class="td-note">Lp × %</td></tr>
+            <tr><td class="td-lbl">Vclamp 목표</td><td class="td-inp"><input id="inp-vclamp" value="250"></td><td class="td-unit">V</td><td class="td-note">> Vr 필수</td></tr>
+            <tr><td class="td-lbl">ΔVc 리플</td><td class="td-inp"><input id="inp-snub-ripple" value="5"></td><td class="td-unit">%</td><td class="td-note">Cap 리플 비율</td></tr>
+            <tr><td class="td-lbl">P_snubber</td><td class="td-cal" id="cal-psnub">—</td><td class="td-unit">W</td><td class="td-note">½·Llk·Ipk²·Fsw</td></tr>
+            <tr><td class="td-lbl">R_snub</td><td class="td-cal" id="cal-rsnub">—</td><td class="td-unit">kΩ</td><td class="td-note">Vclamp²/Psnub</td></tr>
+            <tr><td class="td-lbl">C_snub</td><td class="td-cal" id="cal-csnub">—</td><td class="td-unit">nF</td><td class="td-note">1/(R·Fsw·ripple)</td></tr>
+            <tr><td class="td-lbl">R 발열</td><td class="td-cal" id="cal-prsnub">—</td><td class="td-unit">W</td><td class="td-note">= P_snubber</td></tr>
+            <tr><td class="td-lbl">VDS (clamped)</td><td class="td-cal" id="cal-vds-clamp">—</td><td class="td-unit">V</td><td class="td-note">Vin_max + Vclamp</td></tr>
+            <tr><td class="td-lbl">Snub D Vrrm</td><td class="td-cal" id="cal-snub-dvrrm">—</td><td class="td-unit">V</td><td class="td-note">≥ Vin_max+Vclamp</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:4px;">
+          <div class="loss-bar-wrap">
+            <div class="loss-bar-label"><span>VDS clamped</span><span id="stress-vds-clamp-val">— V</span></div>
+            <div class="stress-bar-outer"><div class="stress-bar-fill safe" id="stress-vds-clamp-bar" style="width:0%"></div></div>
+          </div>
+          <div style="font-size:9px; color:var(--dim); padding:2px 0;" id="snub-vclamp-warn"></div>
+        </div>
+      </div>
+    </div>
+   </div><!-- /top-panels -->
+
+    <!-- BOTTOM — Wire Table (same page) -->
+    <div id="bottom-wire">
+      <div style="display:flex; align-items:center; gap:10px; background:var(--sub1); color:#ddeeff; padding:4px 12px; font-size:10px; font-weight:600; text-transform:uppercase; position:sticky; top:0; z-index:10;">
+        ⑥ Wire Table
+        <button class="wire-add" onclick="addChannel()">+ Add Channel</button>
+        <div style="margin-left:auto; display:flex; gap:8px; font-size:8px; font-weight:400; text-transform:none;">
+          <span style="display:flex;align-items:center;gap:3px"><span class="dot" style="background:var(--c-input)"></span>입력</span>
+          <span style="display:flex;align-items:center;gap:3px"><span class="dot" style="background:var(--c-key)"></span>핵심★</span>
+          <span style="display:flex;align-items:center;gap:3px"><span class="dot" style="background:var(--c-calc)"></span>자동계산</span>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="wt" id="winding-table">
+          <thead>
+            <tr>
+              <th>Ch</th><th>Tab</th><th>Winding</th>
+              <th>Vo[V]</th><th>Iout[A]</th><th>Ns.set</th><th>Dia[mm]</th>
+              <th>Ipk[A]</th><th>Irms[A]</th><th>Ns.cal</th><th>Vo.Cal[V]</th><th>Vrrm[V]</th>
+              <th>SetA[mm²]</th><th>CalA[mm²]</th><th>Margin%</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="winding-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- /page1 -->
+
+</div>
+
+<!-- Library Modal -->
+<div class="modal-overlay" id="modal-lib">
+  <div class="modal">
+    <h3 id="lib-title">Component Library</h3>
+    <div id="lib-tabs" style="display:flex;gap:4px;margin-bottom:10px;">
+      <button class="btn btn-save" onclick="showLibTab('core')">Core</button>
+      <button class="btn btn-save" onclick="showLibTab('mosfet')">MOSFET</button>
+      <button class="btn btn-save" onclick="showLibTab('ic')">IC</button>
+    </div>
+    <div id="lib-content"></div>
+    <div class="btn-row">
+      <button class="btn btn-save" onclick="closeLibrary()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Compare Modal (Phase 4) -->
+<div class="cmp-overlay" id="modal-cmp">
+  <div class="cmp-panel">
+    <h3>Preset Compare <span style="font-size:9px;font-weight:400;color:var(--dim)">1안 vs 2안 비교</span></h3>
+    <div class="cmp-hdr-row">
+      <label>A:</label>
+      <select id="cmp-sel-a"><option value="">-- Preset A --</option></select>
+      <span style="font-size:10px;color:var(--dim)">vs</span>
+      <label>B:</label>
+      <select id="cmp-sel-b"><option value="">-- Preset B --</option></select>
+      <button class="btn btn-save" onclick="runCompare()">비교</button>
+      <button class="btn btn-del" onclick="closeCompare()">닫기</button>
+      <label style="margin-left:auto;font-size:9px;color:var(--dim);display:flex;align-items:center;gap:3px">
+        <input type="checkbox" id="cmp-show-input" checked> 입력값 포함
+      </label>
+    </div>
+    <div id="cmp-result" style="font-size:10px;color:var(--dim);padding:20px 0;text-align:center">프리셋 2개를 선택 후 [비교] 클릭</div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// DATABASE — Embedded (단일 HTML)
+// ══════════════════════════════════════════════════════════════
+
+const CORE_DB = [
+  { name:"EE10",  ae:12.1, le:26.1, ve:316,  al_zero:850,  aw:11.2, bobbin_h:5.5,  bsat:0.39, material:"PC47", type:"EE" },
+  { name:"EE13",  ae:17.1, le:30.2, ve:516,  al_zero:1130, aw:15.4, bobbin_h:7.0,  bsat:0.39, material:"PC47", type:"EE" },
+  { name:"EE16",  ae:19.0, le:34.5, ve:680,  al_zero:1140, aw:19.7, bobbin_h:8.0,  bsat:0.39, material:"PC47", type:"EE" },
+  { name:"EE19",  ae:23.0, le:39.4, ve:900,  al_zero:1250, aw:26.2, bobbin_h:9.0,  bsat:0.39, material:"PC47", type:"EE" },
+  { name:"EE2020",ae:30.5, le:43.0, ve:1340, al_zero:1550, aw:28.0, bobbin_h:12.4, bsat:0.39, material:"PC40", type:"EE" },
+  { name:"EE22",  ae:41.1, le:39.2, ve:1610, al_zero:1600, aw:37.8, bobbin_h:10.0, bsat:0.39, material:"PC40", type:"EE" },
+  { name:"EE25",  ae:40.2, le:49.4, ve:1990, al_zero:1900, aw:44.2, bobbin_h:12.2, bsat:0.39, material:"PC40", type:"EE" },
+  { name:"EI16",  ae:19.8, le:33.0, ve:653,  al_zero:1100, aw:18.0, bobbin_h:8.0,  bsat:0.39, material:"PC40", type:"EI" },
+  { name:"EI19",  ae:24.0, le:39.6, ve:950,  al_zero:1250, aw:24.0, bobbin_h:9.5,  bsat:0.39, material:"PC40", type:"EI" },
+  { name:"EI22",  ae:42.0, le:39.3, ve:1651, al_zero:1600, aw:36.0, bobbin_h:10.0, bsat:0.39, material:"PC40", type:"EI" },
+];
+
+const IC_DB = [
+  { name:"BD7F100HFN", duty_min:20, duty_max:50, fsw:60, fsw_fixed:true, ocp_voltage:1.0, note:"ROHM, Duty 20~50%, Fsw 60kHz fixed" },
+];
+
+const MOSFET_DB = [
+  { name:"STH3N150", vds:1500, id_max:2.5, rdson_typ:6, rdson_max:9, coss:102, ciss:939, qg:29.3, tr:47, tf:61, td_on:24, td_off:45, vgs_th:4, package:"H2PAK-2" },
+];
+
+// Steinmetz: Pv[mW/cm³] = k × f[Hz]^a × Bm[T]^b  (Bm = ΔB/2, half-amplitude)
+// k fitted from TDK PC40/PC47 loss curves @100°C
+const STEINMETZ = {
+  "PC40": { k: 3.2e-4, a: 1.63, b: 2.58 },
+  "PC47": { k: 1.4e-3, a: 1.46, b: 2.67 },
+};
+
+// Bsat temperature derating (linear approx from TDK data)
+// Bsat(T) = Bsat_25 * (1 - derating_coeff * (T - 25))
+const BSAT_DERATING = {
+  "PC40": 0.0020,  // ~0.2%/°C → 0.39T @25°C → ~0.33T @100°C
+  "PC47": 0.0018,
+};
+
+const mu0 = 4 * Math.PI * 1e-7;
+
+// ── User custom DB (localStorage) ──
+function loadUserDB(key) { try { return JSON.parse(localStorage.getItem(key)) || []; } catch { return []; } }
+function saveUserDB(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
+
+let userCores = loadUserDB('user_cores');
+let userMosfets = loadUserDB('user_mosfets');
+let userICs = loadUserDB('user_ics');
+
+function getAllCores()   { return [...CORE_DB, ...userCores]; }
+function getAllMosfets() { return [...MOSFET_DB, ...userMosfets]; }
+function getAllICs()     { return [...IC_DB, ...userICs]; }
+
+// ══════════════════════════════════════════════════════════════
+// 2차측 채널
+// ══════════════════════════════════════════════════════════════
+
+let secondaryChannels = [
+  { id:'pv15',  name:'PV15',  tab:'W4', winding:'6-7',   vo:15,  io:0.200, ns:10, dia:0.30 },
+  { id:'nv15',  name:'NV15',  tab:'W5', winding:'5-6',   vo:-15, io:0.010, ns:10, dia:0.30 },
+  { id:'ipv24', name:'IPV24', tab:'W3', winding:'10-11', vo:24,  io:0.180, ns:14, dia:0.30 },
+];
+let chCounter = 4;
+
+// ══════════════════════════════════════════════════════════════
+// UTILITY
+// ══════════════════════════════════════════════════════════════
+
+function getVal(id, def=0) { const el = document.getElementById(id); return el ? (parseFloat(el.value) || def) : def; }
+function setVal(id, val) { const el = document.getElementById(id); if (el) el.value = val; }
+
+const flashTimers = new WeakMap();
+function flashElement(el) {
+  if (!el) return;
+  el.classList.remove('flash');
+  void el.offsetWidth;
+  el.classList.add('flash');
+  if (flashTimers.has(el)) clearTimeout(flashTimers.get(el));
+  flashTimers.set(el, setTimeout(() => { el.classList.remove('flash'); flashTimers.delete(el); }, 4200));
+}
+
+// Track previous values for trend arrows
+const prevValues = {};
+
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const newText = String(text);
+  if (el.textContent !== newText) {
+    // Store trend info
+    const oldNum = parseFloat(el.textContent);
+    const newNum = parseFloat(newText);
+    if (!isNaN(oldNum) && !isNaN(newNum) && oldNum !== newNum) {
+      prevValues[id] = { old: oldNum, new: newNum, dir: newNum > oldNum ? 'up' : 'down' };
+    }
+    el.textContent = newText;
+    flashElement(el);
+  }
+}
+
+function setHTML(id, html) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.innerHTML !== html) { el.innerHTML = html; flashElement(el); }
+}
+
+function updateStatus(id, pass) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const newText = pass ? 'PASS' : 'FAIL';
+  if (el.textContent !== newText) {
+    el.textContent = newText;
+    el.className = pass ? 'td-pass' : 'td-fail';
+    flashElement(el);
+  }
+}
+
+function updateBadge(id, pass) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.querySelector('.kv').textContent = pass ? 'PASS' : 'FAIL';
+  el.className = 'kpi ' + (pass ? 'pass' : 'fail');
+}
+
+// ══════════════════════════════════════════════════════════════
+// CORE / MOSFET DROPDOWN INIT
+// ══════════════════════════════════════════════════════════════
+
+function populateDropdowns() {
+  const coreSel = document.getElementById('sel-core');
+  coreSel.innerHTML = '';
+  getAllCores().forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.name; opt.textContent = c.name;
+    coreSel.appendChild(opt);
+  });
+  coreSel.value = 'EE2020';
+
+  const mosSel = document.getElementById('sel-mosfet');
+  mosSel.innerHTML = '';
+  getAllMosfets().forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.name; opt.textContent = m.name;
+    mosSel.appendChild(opt);
+  });
+  mosSel.value = 'STH3N150';
+}
+
+function onCoreChange() {
+  const name = document.getElementById('sel-core').value;
+  const core = getAllCores().find(c => c.name === name);
+  if (!core) return;
+  setText('cal-ae', core.ae.toFixed(1));
+  setText('cal-alzero', core.al_zero.toFixed(0));
+  setText('cal-bsat', core.bsat.toFixed(2));
+  setText('cal-bobbinh', core.bobbin_h.toFixed(1));
+  setText('cal-bobbinh2', core.bobbin_h.toFixed(1));
+  document.getElementById('core-material').textContent = core.material;
+  updateAll();
+}
+
+function onMosfetChange() {
+  const name = document.getElementById('sel-mosfet').value;
+  const mos = getAllMosfets().find(m => m.name === name);
+  if (!mos) return;
+  setText('cal-vds-rating', mos.vds.toFixed(0));
+  setText('cal-rdson', mos.rdson_typ.toFixed(1));
+  document.getElementById('mosfet-pkg').textContent = mos.package;
+  updateAll();
+}
+
+// ══════════════════════════════════════════════════════════════
+// WIRE TABLE RENDERING
+// ══════════════════════════════════════════════════════════════
+
+function renderWireTable() {
+  const tbody = document.getElementById('winding-tbody');
+  // Np row (always first)
+  let html = `<tr id="ch-np">
+    <td class="wch">Np</td><td>W1,W2</td><td>1-3</td>
+    <td class="wcal">—</td><td class="wcal">—</td>
+    <td class="wkey"><input id="ch-np-ns" value="${getVal('inp-np',90)}" onchange="setVal('inp-np',this.value);updateAll()"></td>
+    <td class="wui"><input id="ch-np-dia" value="0.2" onchange="updateAll()"></td>
+    <td class="wcal" id="ch-np-ipk">—</td><td class="wcal" id="ch-np-irms">—</td>
+    <td class="wcal" id="ch-np-nscal">—</td><td class="wcal">—</td><td class="wcal">—</td>
+    <td class="wcal" id="ch-np-seta">—</td><td class="wcal" id="ch-np-cala">—</td>
+    <td class="mp" id="ch-np-margin">—</td><td>—</td>
+  </tr>`;
+
+  secondaryChannels.forEach(ch => {
+    html += `<tr id="ch-${ch.id}">
+      <td class="wch">${ch.name}</td>
+      <td class="wui"><input value="${ch.tab}" style="width:40px" onchange="updateChField('${ch.id}','tab',this.value)"></td>
+      <td class="wui"><input value="${ch.winding}" style="width:40px" onchange="updateChField('${ch.id}','winding',this.value)"></td>
+      <td class="wui"><input value="${ch.vo}" onchange="updateChField('${ch.id}','vo',parseFloat(this.value));updateAll()"></td>
+      <td class="wui"><input value="${ch.io}" onchange="updateChField('${ch.id}','io',parseFloat(this.value));updateAll()"></td>
+      <td class="wkey"><input value="${ch.ns}" onchange="updateChField('${ch.id}','ns',parseInt(this.value));updateAll()"></td>
+      <td class="wui"><input value="${ch.dia}" onchange="updateChField('${ch.id}','dia',parseFloat(this.value));updateAll()"></td>
+      <td class="wcal" id="ch-${ch.id}-ipk">—</td>
+      <td class="wcal" id="ch-${ch.id}-irms">—</td>
+      <td class="wcal" id="ch-${ch.id}-nscal">—</td>
+      <td class="wcal" id="ch-${ch.id}-vocal">—</td>
+      <td class="wcal" id="ch-${ch.id}-vrrm">—</td>
+      <td class="wcal" id="ch-${ch.id}-seta">—</td>
+      <td class="wcal" id="ch-${ch.id}-cala">—</td>
+      <td class="mp" id="ch-${ch.id}-margin">—</td>
+      <td><button class="xbtn" onclick="removeChannel('${ch.id}')">✕</button></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function updateChField(id, field, val) {
+  const ch = secondaryChannels.find(c => c.id === id);
+  if (ch) ch[field] = val;
+}
+
+function addChannel() {
+  const id = 'ch' + chCounter++;
+  secondaryChannels.push({ id, name:'OUT'+chCounter, tab:'W?', winding:'?-?', vo:12, io:0.1, ns:5, dia:0.3 });
+  renderWireTable();
+  updateAll();
+}
+
+function removeChannel(id) {
+  secondaryChannels = secondaryChannels.filter(c => c.id !== id);
+  renderWireTable();
+  updateAll();
+}
+
+// ══════════════════════════════════════════════════════════════
+// MAIN CALCULATION ENGINE — Excel 2안 수식
+// ══════════════════════════════════════════════════════════════
+
+function updateAll() {
+  // 1. Read inputs
+  const eff = getVal('inp-eff', 0.8);
+  const Vin_min = getVal('inp-vinmin', 300);
+  const Vin_max = getVal('inp-vinmax', 850);
+  const Fsw_kHz = getVal('inp-fsw', 60);
+  const Fsw = Fsw_kHz * 1e3;
+  const VD_F = getVal('inp-vdf', 0.9);
+  const Np = getVal('inp-np', 90);
+  const Ns = getVal('inp-ns', 10);
+  const V_spike = getVal('inp-vspike', 200);
+  const Lp_set = getVal('inp-lp', 1050);
+  const Lp = Lp_set * 1e-6;
+  const airgap = getVal('inp-airgap', 0.3);
+  const BM_set = getVal('inp-bmset', 0.3);
+  const wireBare = getVal('inp-wirebare', 0.2);
+  const wireCoat = getVal('inp-wirecoat', 0.2);
+  const barrier = getVal('inp-barrier', 2);
+  const jDensity = getVal('inp-jdensity', 7);
+  const R_shunt = getVal('inp-rshunt', 1);
+  const VDS_margin = getVal('inp-vds-margin', 150);
+  const corePerim = getVal('inp-coreperim', 24.4);
+  const opTemp = getVal('inp-temp', 25);
+
+  // Core data from dropdown
+  const coreName = document.getElementById('sel-core').value;
+  const core = getAllCores().find(c => c.name === coreName) || getAllCores()[4];
+  const Ae = core.ae;
+  const AL_zero = core.al_zero;
+  const bobbinH = core.bobbin_h;
+
+  // MOSFET data
+  const mosName = document.getElementById('sel-mosfet').value;
+  const mos = getAllMosfets().find(m => m.name === mosName) || getAllMosfets()[0];
+  const VDS_rating = mos.vds;
+  const VDS_limit = VDS_rating - VDS_margin;
+  const Rdson = mos.rdson_typ;
+
+  // IC data
+  const ic = getAllICs()[0];
+  const OCP_V = ic.ocp_voltage;
+  const Ipk_limit = OCP_V / R_shunt;
+
+  // Pout from channels
+  const Pout = secondaryChannels.reduce((s, ch) => s + Math.abs(ch.vo) * ch.io, 0);
+  const Pin = Pout / eff;
+
+  // Main output (first channel)
+  const mainCh = secondaryChannels[0] || { vo: 15 };
+  const Vout = Math.abs(mainCh.vo);
+
+  // 2. Calculations
+  const n = Np / Ns;
+  const Vr = n * (Vout + VD_F);
+
+  // n limits
+  const n_upper = (VDS_limit - Vin_max) / (Vout + VD_F);
+
+  // Lp magnetic
+  const Ae_m2 = Ae * 1e-6;
+  const gap_m = airgap * 1e-3;
+  const Lp_mag = (mu0 * Np * Np * Ae_m2 / gap_m) * 1e6;
+
+  // D_on (from Lp_mag for initial calc)
+  const Lp_for_Don = Lp_mag * 1e-6;
+  const D_on_init = Math.sqrt(2 * Pin * Lp_for_Don * Fsw) / Vin_min;
+
+  // n lower (DCM condition, using calculated duty)
+  const n_lower = Vin_min / ((Vout + VD_F) * (1 / D_on_init - 1));
+
+  // Lp energy
+  const Lp_eng = (Vin_min * Vin_min * D_on_init * D_on_init) / (2 * Pin * Fsw) * 1e6;
+
+  // D_on with Lp_set
+  const D_on = Math.sqrt(2 * Pin * Lp * Fsw) / Vin_min;
+  const D_off = D_on * Vin_min / Vr;
+  const D_sum = D_on + D_off;
+  const D_dead = Math.max(1 - D_sum, 0);
+  const isDCM = D_sum < 1;
+
+  // Ipeak
+  const Ipk = 2 * Pin / (Vin_min * D_on);
+  const Ip_rms = Ipk * Math.sqrt(D_on / 3);
+
+  // P_set
+  const P_set = 0.5 * Lp * Ipk * Ipk * Fsw;
+
+  // VDS
+  const VDS_calc = Vin_max + Vr + V_spike;
+
+  // AL_g
+  const AL_g = (mu0 * Ae_m2 / gap_m) * 1e9;
+
+  // delta_B
+  const delta_B = (Lp * Ipk) / (Np * Ae_m2);
+
+  // Wire
+  const windingH = bobbinH - barrier;
+  const maxTurns = Math.floor(windingH / wireCoat);
+
+  // Flux margin
+  const fluxUsedPct = (delta_B / BM_set) * 100;
+  const fluxMarginPct = 100 - fluxUsedPct;
+
+  // Bsat temperature derating
+  const material = core.material;
+  const derateCoeff = BSAT_DERATING[material] || 0.002;
+  const bsat_temp = core.bsat * (1 - derateCoeff * Math.max(opTemp - 25, 0));
+  const bsat_margin_temp = ((bsat_temp - delta_B) / bsat_temp) * 100;
+
+  // ═══════════════════════════════════════════════════════════
+  // 3. LOSS ESTIMATION (Phase 2 — 고도화)
+  // ═══════════════════════════════════════════════════════════
+
+  const Vgs = getVal('inp-vgs', 10);
+  const Rg = getVal('inp-rg', 4.7);
+
+  // MOSFET conduction loss: Irms² × Rds_on (온도 보정: +0.4%/°C)
+  const Rdson_temp = Rdson * (1 + 0.004 * Math.max(opTemp - 25, 0));
+  const P_mos_cond = Ip_rms * Ip_rms * Rdson_temp;
+
+  // MOSFET switching loss: 0.5 × Vds × Id × (tr + tf) × Fsw
+  const tr_s = (mos.tr || 47) * 1e-9;
+  const tf_s = (mos.tf || 61) * 1e-9;
+  const P_mos_sw = 0.5 * VDS_calc * Ipk * (tr_s + tf_s) * Fsw;
+
+  // Gate drive loss: Qg × Vgs × Fsw
+  const Qg = (mos.qg || 29.3) * 1e-9;
+  const P_gate = Qg * Vgs * Fsw;
+
+  const P_mos_total = P_mos_cond + P_mos_sw + P_gate;
+
+  // Diode loss: VD_F × Iout (per channel, summed)
+  const Iout_total = secondaryChannels.reduce((s, ch) => s + ch.io, 0);
+  const P_diode = VD_F * Iout_total;
+
+  // Copper loss (primary): I²R with multi-layer correction
+  const rho_cu = 1.72e-8 * (1 + 0.00393 * (opTemp - 25));
+  const wireArea_pri = Math.PI * Math.pow(wireBare / 2 * 1e-3, 2);
+  // Layer count and mean turn length
+  const turnsPerLayer = maxTurns;
+  const priLayers = Math.ceil(Np / Math.max(turnsPerLayer, 1));
+  const meanPerim_pri = corePerim + (priLayers - 1) * wireBare * Math.PI;
+  const wireLen_pri = Np * meanPerim_pri * 1e-3;
+  const R_pri = rho_cu * wireLen_pri / wireArea_pri;
+  const P_cu_pri = Ip_rms * Ip_rms * R_pri;
+
+  // Copper loss (secondary): per channel with layer offset
+  let P_cu_sec = 0;
+  let totalSecTurns = 0;
+  secondaryChannels.forEach(ch => {
+    const ns_turns = ch.ns || 10;
+    totalSecTurns += ns_turns;
+    const Is_peak = ch.io * 2 / D_off;
+    const Is_rms = Is_peak * Math.sqrt(D_off / 3);
+    const wireA_sec = Math.PI * Math.pow(ch.dia / 2 * 1e-3, 2);
+    const secLayerOffset = priLayers * wireCoat;
+    const meanPerim_sec = corePerim + secLayerOffset * Math.PI;
+    const wireL_sec = ns_turns * meanPerim_sec * 1e-3;
+    const R_sec = rho_cu * wireL_sec / wireA_sec;
+    P_cu_sec += Is_rms * Is_rms * R_sec;
+  });
+  const P_copper = P_cu_pri + P_cu_sec;
+
+  const st = STEINMETZ[material] || STEINMETZ["PC40"];
+  const Bm_T = delta_B / 2;
+  const Ve_cm3 = core.ve / 1000;
+  const tempCorr = 1 + 0.003 * Math.abs(opTemp - 80);
+  const Pv = st.k * Math.pow(Fsw, st.a) * Math.pow(Math.max(Bm_T, 1e-4), st.b) * tempCorr;
+  const P_core = Pv * Ve_cm3 / 1000;
+
+  const P_loss_no_snub = P_mos_total + P_diode + P_copper + P_core;
+  const eta_no_snub = Pout / (Pout + P_loss_no_snub);
+
+  // MOSFET junction temperature estimation
+  const Rth_jc = 62;
+  const Tj_est = opTemp + P_mos_total * Rth_jc;
+
+  // Window utilization
+  const totalWireArea = Np * Math.PI * Math.pow(wireCoat/2, 2)
+    + secondaryChannels.reduce((s, ch) => s + (ch.ns || 10) * Math.PI * Math.pow(ch.dia/2, 2), 0);
+  const windowArea = core.aw || 28;
+  const winUtil = (totalWireArea / windowArea) * 100;
+
+  // ═══════════════════════════════════════════════════════════
+  // 3b. RCD SNUBBER (Phase 3)
+  // ═══════════════════════════════════════════════════════════
+
+  const Llk_pct = getVal('inp-llk-pct', 1);
+  const Llk = Lp * Llk_pct / 100;
+  const Vclamp = getVal('inp-vclamp', 250);
+  const snubRipplePct = getVal('inp-snub-ripple', 5);
+
+  const P_snub = 0.5 * Llk * Ipk * Ipk * Fsw;
+  const R_snub = P_snub > 1e-9 ? (Vclamp * Vclamp) / P_snub : Infinity;
+  const C_snub = (R_snub < Infinity && snubRipplePct > 0)
+    ? 1 / (R_snub * Fsw * (snubRipplePct / 100))
+    : 0;
+  const VDS_clamped = Vin_max + Vclamp;
+  const snubDiodeVrrm = VDS_clamped;
+  const vclampOk = Vclamp > Vr;
+
+  const P_loss_total = P_loss_no_snub + P_snub;
+  const eta_calc = Pout / (Pout + P_loss_total);
+
+  // ═══════════════════════════════════════════════════════════
+  // 4. UI UPDATE
+  // ═══════════════════════════════════════════════════════════
+
+  setText('hdr-meta', `${coreName} · ${Pout.toFixed(2)}W · ${Vin_min}~${Vin_max}V DC`);
+
+  // Input Spec
+  setText('cal-pout', Pout.toFixed(2));
+  setText('cal-pin', Pin.toFixed(2));
+
+  // Turn Ratio
+  setText('cal-nmax', n_upper.toFixed(2));
+  setText('cal-nmin', n_lower.toFixed(2));
+  setText('cal-n', n.toFixed(2));
+  setText('cal-vr', Vr.toFixed(2));
+
+  // Lp
+  setText('cal-lp-mag', Lp_mag.toFixed(2));
+  setText('cal-lp-eng', Lp_eng.toFixed(2));
+  setText('cal-don', (D_on * 100).toFixed(2));
+  setText('cal-doff', (D_off * 100).toFixed(2));
+
+  // Core
+  setText('cal-alg', AL_g.toFixed(2));
+  setText('cal-deltab', delta_B.toFixed(4));
+
+  // Wire
+  setText('cal-windingh', windingH.toFixed(2));
+  setText('cal-maxturns', maxTurns);
+
+  // Judgments
+  setText('cal-dcm', isDCM ? 'DCM' : 'CCM');
+  setText('cal-ipk', Ipk.toFixed(4));
+  setText('cal-pset', P_set.toFixed(2));
+  setText('cal-vds', VDS_calc.toFixed(1));
+  setText('cal-flux-st', delta_B.toFixed(4));
+
+  updateStatus('st-dcm', isDCM);
+  updateStatus('st-ipk', Ipk <= Ipk_limit);
+  updateStatus('st-pwr', P_set >= Pin);
+  updateStatus('st-vds', VDS_calc <= VDS_limit);
+  updateStatus('st-flux', delta_B <= BM_set);
+
+  // MOSFET section
+  setText('cal-vds-rating', VDS_rating.toFixed(0));
+  setText('cal-vds-limit', VDS_limit.toFixed(0));
+  setText('cal-rdson', Rdson.toFixed(1));
+  setText('cal-ocp', OCP_V.toFixed(1));
+  setText('cal-ipklimit', Ipk_limit.toFixed(3));
+
+  // KPI
+  setHTML('kpi-don', `${(D_on*100).toFixed(2)}<span class="ku">%</span>`);
+  setHTML('kpi-doff', `${(D_off*100).toFixed(2)}<span class="ku">%</span>`);
+  setHTML('kpi-dsum', `${(D_sum*100).toFixed(2)}<span class="ku">%</span>`);
+  setHTML('kpi-ipk', `${Ipk.toFixed(3)}<span class="ku">A</span>`);
+  setHTML('kpi-pset', `${P_set.toFixed(2)}<span class="ku">W</span>`);
+  setHTML('kpi-vds', `${VDS_calc.toFixed(0)}<span class="ku">V</span>`);
+
+  // Lp compare
+  setText('res-lpmag', Lp_mag.toFixed(2));
+  setText('res-lpeng', Lp_eng.toFixed(2));
+  setText('res-lpset', Lp_set.toFixed(0));
+
+  // Badges
+  updateBadge('badge-dcm', isDCM);
+  updateBadge('badge-ipk', Ipk <= Ipk_limit);
+  updateBadge('badge-pwr', P_set >= Pin);
+  updateBadge('badge-vds', VDS_calc <= VDS_limit);
+  updateBadge('badge-flux', delta_B <= BM_set);
+
+  // Duty bar
+  const donEl = document.getElementById('duty-don');
+  const doffEl = document.getElementById('duty-doff');
+  const deadEl = document.getElementById('duty-dead');
+  if (donEl) { donEl.style.width = `${D_on*100}%`; donEl.textContent = `${(D_on*100).toFixed(0)}%`; }
+  if (doffEl) { doffEl.style.width = `${D_off*100}%`; doffEl.textContent = `${(D_off*100).toFixed(0)}%`; }
+  if (deadEl) { deadEl.textContent = `Dead ${(D_dead*100).toFixed(0)}%`; }
+
+  const dcmSt = document.getElementById('dcm-status');
+  if (dcmSt) {
+    dcmSt.textContent = isDCM ? `DCM ✓ ${(D_dead*100).toFixed(2)}%` : 'CCM ✗';
+    dcmSt.classList.toggle('fail', !isDCM);
+  }
+
+  // Flux bar
+  const fUsed = document.getElementById('flux-used');
+  const fMargin = document.getElementById('flux-margin');
+  const fPct = document.getElementById('flux-margin-pct');
+  if (fUsed) { fUsed.style.width = `${Math.min(fluxUsedPct,100)}%`; fUsed.textContent = `ΔB ${fluxUsedPct.toFixed(0)}%`; }
+  if (fMargin) { fMargin.textContent = `여유 ${Math.max(fluxMarginPct,0).toFixed(0)}%`; }
+  if (fPct) { fPct.textContent = `${fluxMarginPct.toFixed(1)}%`; fPct.classList.toggle('fail', fluxMarginPct < 0); }
+
+  // Core temp derating
+  setText('cal-bsat-temp', bsat_temp.toFixed(3));
+  setText('cal-bsat-margin', bsat_margin_temp.toFixed(1));
+
+  // ── Loss panel (Phase 2) ──
+  const allLosses = [P_mos_cond, P_mos_sw, P_gate, P_diode, P_cu_pri, P_cu_sec, P_core, P_snub];
+  const maxLoss = Math.max(...allLosses, 0.001);
+  const lossScale = 100 / maxLoss;
+
+  document.getElementById('loss-mos-cond-val').textContent = `${P_mos_cond.toFixed(3)} W`;
+  document.getElementById('loss-mos-cond-bar').style.width = `${P_mos_cond * lossScale}%`;
+  document.getElementById('loss-mos-sw-val').textContent = `${P_mos_sw.toFixed(3)} W`;
+  document.getElementById('loss-mos-sw-bar').style.width = `${P_mos_sw * lossScale}%`;
+  document.getElementById('loss-gate-val').textContent = `${P_gate.toFixed(4)} W`;
+  document.getElementById('loss-gate-bar').style.width = `${P_gate * lossScale}%`;
+  document.getElementById('loss-diode-val').textContent = `${P_diode.toFixed(3)} W`;
+  document.getElementById('loss-diode-bar').style.width = `${P_diode * lossScale}%`;
+  document.getElementById('loss-cu-pri-val').textContent = `${P_cu_pri.toFixed(4)} W`;
+  document.getElementById('loss-cu-pri-bar').style.width = `${P_cu_pri * lossScale}%`;
+  document.getElementById('loss-cu-sec-val').textContent = `${P_cu_sec.toFixed(4)} W`;
+  document.getElementById('loss-cu-sec-bar').style.width = `${P_cu_sec * lossScale}%`;
+  document.getElementById('loss-core-val').textContent = `${P_core.toFixed(4)} W`;
+  document.getElementById('loss-core-bar').style.width = `${P_core * lossScale}%`;
+  document.getElementById('loss-snub-val').textContent = `${P_snub.toFixed(4)} W`;
+  document.getElementById('loss-snub-bar').style.width = `${P_snub * lossScale}%`;
+  document.getElementById('loss-total-val').textContent = `${P_loss_total.toFixed(3)} W`;
+  document.getElementById('loss-eta-val').textContent = `${(eta_calc * 100).toFixed(1)}%`;
+  document.getElementById('loss-eta-val').style.color = eta_calc >= eff ? 'var(--c-pass-t)' : 'var(--c-fail-t)';
+  document.getElementById('loss-mos-pd-val').textContent = `${P_mos_total.toFixed(3)} W`;
+  document.getElementById('loss-tj-val').textContent = `${Tj_est.toFixed(0)} °C`;
+  document.getElementById('loss-tj-val').style.color = Tj_est > 150 ? 'var(--c-fail-t)' : Tj_est > 125 ? '#e0a030' : 'var(--dim)';
+
+  // ── Stress panel (Phase 2) ──
+  const vdsPct = (VDS_calc / VDS_limit) * 100;
+  document.getElementById('stress-vds-val').textContent = `${VDS_calc.toFixed(0)} / ${VDS_limit.toFixed(0)} V`;
+  document.getElementById('stress-vds-bar').style.width = `${Math.min(vdsPct, 100)}%`;
+  document.getElementById('stress-vds-bar').className = 'stress-bar-fill ' + (vdsPct > 100 ? 'danger' : vdsPct > 85 ? 'warn' : 'safe');
+
+  const ipkPct = (Ipk / Ipk_limit) * 100;
+  document.getElementById('stress-ipk-val').textContent = `${Ipk.toFixed(3)} / ${Ipk_limit.toFixed(3)} A`;
+  document.getElementById('stress-ipk-bar').style.width = `${Math.min(ipkPct, 100)}%`;
+  document.getElementById('stress-ipk-bar').className = 'stress-bar-fill ' + (ipkPct > 100 ? 'danger' : ipkPct > 85 ? 'warn' : 'safe');
+
+  const fluxPct = (delta_B / BM_set) * 100;
+  document.getElementById('stress-flux-val').textContent = `${delta_B.toFixed(3)} / ${BM_set.toFixed(2)} T`;
+  document.getElementById('stress-flux-bar').style.width = `${Math.min(fluxPct, 100)}%`;
+  document.getElementById('stress-flux-bar').className = 'stress-bar-fill ' + (fluxPct > 100 ? 'danger' : fluxPct > 85 ? 'warn' : 'safe');
+
+  // Diode Vrrm stress — per channel
+  let vrrmHtml = '';
+  secondaryChannels.forEach(ch => {
+    const ns = ch.ns || 10;
+    const vrrm = Vin_max / (Np / ns) + Math.abs(ch.vo);
+    vrrmHtml += `<div class="loss-bar-wrap">
+      <div class="loss-bar-label"><span>Vrrm ${ch.name}</span><span>${vrrm.toFixed(0)} V</span></div>
+      <div class="stress-bar-outer"><div class="stress-bar-fill safe" style="width:${Math.min(vrrm/500*100,100)}%"></div></div>
+    </div>`;
+  });
+  document.getElementById('stress-vrrm-list').innerHTML = vrrmHtml;
+
+  // Core verification
+  setText('cal-win-util', winUtil.toFixed(1));
+
+  // ── RCD Snubber (Phase 3) ──
+  setText('cal-llk', (Llk * 1e6).toFixed(2));
+  setText('cal-psnub', P_snub.toFixed(4));
+  setText('cal-rsnub', R_snub < Infinity ? (R_snub / 1000).toFixed(1) : '∞');
+  setText('cal-csnub', C_snub > 0 ? (C_snub * 1e9).toFixed(1) : '—');
+  setText('cal-prsnub', P_snub.toFixed(4));
+  setText('cal-vds-clamp', VDS_clamped.toFixed(0));
+  setText('cal-snub-dvrrm', snubDiodeVrrm.toFixed(0));
+
+  const vdsClampPct = (VDS_clamped / VDS_limit) * 100;
+  document.getElementById('stress-vds-clamp-val').textContent = `${VDS_clamped.toFixed(0)} / ${VDS_limit.toFixed(0)} V`;
+  document.getElementById('stress-vds-clamp-bar').style.width = `${Math.min(vdsClampPct, 100)}%`;
+  document.getElementById('stress-vds-clamp-bar').className = 'stress-bar-fill ' + (vdsClampPct > 100 ? 'danger' : vdsClampPct > 85 ? 'warn' : 'safe');
+
+  const warnEl = document.getElementById('snub-vclamp-warn');
+  if (warnEl) {
+    if (!vclampOk) {
+      warnEl.textContent = `⚠ Vclamp(${Vclamp}V) ≤ Vr(${Vr.toFixed(0)}V) — 스너버 동작 불가`;
+      warnEl.style.color = 'var(--c-fail-t)';
+    } else {
+      warnEl.textContent = `Vclamp/Vr = ${(Vclamp/Vr).toFixed(2)} (1.2~1.5 권장)`;
+      warnEl.style.color = (Vclamp/Vr >= 1.2 && Vclamp/Vr <= 1.5) ? 'var(--c-pass-t)' : '#e0a030';
+    }
+  }
+
+  // ── Np row in wire table ──
+  const npWireArea = Math.PI * Math.pow(wireBare / 2, 2);
+  const npCalArea = Ip_rms / jDensity;
+  const npMargin = ((npWireArea - npCalArea) / npCalArea) * 100;
+
+  setText('ch-np-ipk', Ipk.toFixed(4));
+  setText('ch-np-irms', Ip_rms.toFixed(4));
+  setText('ch-np-nscal', Np.toFixed(1));
+  setText('ch-np-seta', npWireArea.toFixed(4));
+  setText('ch-np-cala', npCalArea.toFixed(4));
+  const npMEl = document.getElementById('ch-np-margin');
+  if (npMEl) {
+    npMEl.textContent = `${npMargin >= 0 ? '+' : ''}${npMargin.toFixed(0)}%`;
+    npMEl.className = npMargin >= 0 ? 'mp' : 'mf';
+  }
+
+  // ── Secondary channels ──
+  secondaryChannels.forEach(ch => {
+    const ns = ch.ns || 10;
+    const vo_abs = Math.abs(ch.vo);
+    const Is_peak = ch.io * 2 / D_off;
+    const Is_rms = Is_peak * Math.sqrt(D_off / 3);
+    const ns_calc = Np * (vo_abs + VD_F) / Vr;
+    const vo_calc = (ns * Vr / Np) - VD_F;
+    const vrrm = Vin_max / (Np / ns) + vo_abs;
+    const wireArea_set = Math.PI * Math.pow(ch.dia / 2, 2);
+    const wireArea_calc = Is_rms / jDensity;
+    const margin = ((wireArea_set - wireArea_calc) / wireArea_calc) * 100;
+
+    setText(`ch-${ch.id}-ipk`, Is_peak.toFixed(4));
+    setText(`ch-${ch.id}-irms`, Is_rms.toFixed(4));
+    setText(`ch-${ch.id}-nscal`, ns_calc.toFixed(1));
+    setText(`ch-${ch.id}-vocal`, vo_calc.toFixed(1));
+    setText(`ch-${ch.id}-vrrm`, vrrm.toFixed(1));
+    setText(`ch-${ch.id}-seta`, wireArea_set.toFixed(4));
+    setText(`ch-${ch.id}-cala`, wireArea_calc.toFixed(4));
+
+    const mEl = document.getElementById(`ch-${ch.id}-margin`);
+    if (mEl) {
+      mEl.textContent = `${margin >= 0 ? '+' : ''}${margin.toFixed(0)}%`;
+      mEl.className = margin >= 0 ? 'mp' : 'mf';
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// PRESET MANAGEMENT
+// ══════════════════════════════════════════════════════════════
+
+const PRESET_KEY = 'dcm_flyback_presets';
+
+function getAllInputValues() {
+  const inputs = {};
+  document.querySelectorAll('.td-inp input, .td-key input').forEach(inp => {
+    if (inp.id) inputs[inp.id] = inp.value;
+  });
+  inputs['sel-core'] = document.getElementById('sel-core').value;
+  inputs['sel-mosfet'] = document.getElementById('sel-mosfet').value;
+  inputs._channels = JSON.parse(JSON.stringify(secondaryChannels));
+  return inputs;
+}
+
+function setAllInputValues(data) {
+  Object.keys(data).forEach(k => {
+    if (k.startsWith('_')) return;
+    const el = document.getElementById(k);
+    if (!el) return;
+    if (el.tagName === 'SELECT') el.value = data[k];
+    else el.value = data[k];
+  });
+  if (data._channels) {
+    secondaryChannels = data._channels;
+    renderWireTable();
+  }
+  onCoreChange();
+  onMosfetChange();
+}
+
+function loadPresets() {
+  try { return JSON.parse(localStorage.getItem(PRESET_KEY)) || {}; } catch { return {}; }
+}
+
+function savePreset() {
+  const name = document.getElementById('preset-name').value.trim();
+  if (!name) return;
+  const presets = loadPresets();
+  presets[name] = getAllInputValues();
+  localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+  refreshPresetSelect();
+}
+
+function deletePreset() {
+  const sel = document.getElementById('preset-select');
+  const name = sel.value;
+  if (!name) return;
+  const presets = loadPresets();
+  delete presets[name];
+  localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+  refreshPresetSelect();
+}
+
+function loadSelectedPreset() {
+  const name = document.getElementById('preset-select').value;
+  if (!name) return;
+  const presets = loadPresets();
+  if (presets[name]) setAllInputValues(presets[name]);
+}
+
+function refreshPresetSelect() {
+  const sel = document.getElementById('preset-select');
+  const presets = loadPresets();
+  sel.innerHTML = '<option value="">-- Select Preset --</option>';
+  Object.keys(presets).forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    sel.appendChild(opt);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// LIBRARY MODAL
+// ══════════════════════════════════════════════════════════════
+
+function openLibrary() { document.getElementById('modal-lib').classList.add('active'); showLibTab('core'); }
+function closeLibrary() { document.getElementById('modal-lib').classList.remove('active'); }
+
+function showLibTab(tab) {
+  const content = document.getElementById('lib-content');
+  if (tab === 'core') {
+    let html = '<table><thead><tr><th>Name</th><th>Ae</th><th>AL0</th><th>Bsat</th><th>Bobbin H</th><th>Material</th><th>Type</th><th></th></tr></thead><tbody>';
+    getAllCores().forEach((c, i) => {
+      const isUser = i >= CORE_DB.length;
+      html += `<tr><td>${c.name}</td><td>${c.ae}</td><td>${c.al_zero}</td><td>${c.bsat}</td><td>${c.bobbin_h}</td><td>${c.material}</td><td>${c.type}</td>`;
+      html += isUser ? `<td><button class="xbtn" onclick="deleteUserCore(${i - CORE_DB.length})">✕</button></td>` : '<td>built-in</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    html += `<div style="margin-top:8px;font-size:9px;color:var(--dim)">
+      <b>Add Core:</b>
+      <input id="lib-core-name" placeholder="Name" style="width:60px">
+      <input id="lib-core-ae" placeholder="Ae" style="width:40px">
+      <input id="lib-core-al" placeholder="AL0" style="width:40px">
+      <input id="lib-core-bsat" placeholder="Bsat" style="width:35px">
+      <input id="lib-core-bh" placeholder="BobH" style="width:35px">
+      <input id="lib-core-mat" placeholder="Mat" style="width:35px">
+      <input id="lib-core-ve" placeholder="Ve" style="width:40px">
+      <button class="btn btn-save" onclick="addUserCore()">Add</button>
+    </div>`;
+    content.innerHTML = html;
+  } else if (tab === 'mosfet') {
+    let html = '<table><thead><tr><th>Name</th><th>Vds</th><th>Rds_on</th><th>Coss</th><th>Qg</th><th>tr</th><th>tf</th><th>Pkg</th><th></th></tr></thead><tbody>';
+    getAllMosfets().forEach((m, i) => {
+      const isUser = i >= MOSFET_DB.length;
+      html += `<tr><td>${m.name}</td><td>${m.vds}</td><td>${m.rdson_typ}</td><td>${m.coss}</td><td>${m.qg}</td><td>${m.tr}</td><td>${m.tf}</td><td>${m.package}</td>`;
+      html += isUser ? `<td><button class="xbtn" onclick="deleteUserMosfet(${i - MOSFET_DB.length})">✕</button></td>` : '<td>built-in</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    html += `<div style="margin-top:8px;font-size:9px;color:var(--dim)">
+      <b>Add MOSFET:</b>
+      <input id="lib-mos-name" placeholder="Name" style="width:70px">
+      <input id="lib-mos-vds" placeholder="Vds" style="width:40px">
+      <input id="lib-mos-rds" placeholder="Rds" style="width:35px">
+      <input id="lib-mos-coss" placeholder="Coss" style="width:35px">
+      <input id="lib-mos-qg" placeholder="Qg" style="width:30px">
+      <input id="lib-mos-tr" placeholder="tr" style="width:30px">
+      <input id="lib-mos-tf" placeholder="tf" style="width:30px">
+      <input id="lib-mos-pkg" placeholder="Pkg" style="width:50px">
+      <button class="btn btn-save" onclick="addUserMosfet()">Add</button>
+    </div>`;
+    content.innerHTML = html;
+  } else {
+    content.innerHTML = '<p style="color:var(--dim);font-size:10px">IC DB — BD7F100HFN (built-in). 추후 확장 예정.</p>';
+  }
+}
+
+function addUserCore() {
+  userCores.push({
+    name: document.getElementById('lib-core-name').value || 'NEW',
+    ae: parseFloat(document.getElementById('lib-core-ae').value) || 20,
+    le: 35, ve: parseFloat(document.getElementById('lib-core-ve').value) || 800,
+    al_zero: parseFloat(document.getElementById('lib-core-al').value) || 1000,
+    aw: 20, bobbin_h: parseFloat(document.getElementById('lib-core-bh').value) || 8,
+    bsat: parseFloat(document.getElementById('lib-core-bsat').value) || 0.39,
+    material: document.getElementById('lib-core-mat').value || 'PC40', type: 'EE'
+  });
+  saveUserDB('user_cores', userCores);
+  populateDropdowns();
+  showLibTab('core');
+}
+
+function deleteUserCore(idx) { userCores.splice(idx, 1); saveUserDB('user_cores', userCores); populateDropdowns(); showLibTab('core'); }
+
+function addUserMosfet() {
+  userMosfets.push({
+    name: document.getElementById('lib-mos-name').value || 'NEW',
+    vds: parseFloat(document.getElementById('lib-mos-vds').value) || 1500,
+    id_max: 2.5,
+    rdson_typ: parseFloat(document.getElementById('lib-mos-rds').value) || 10,
+    rdson_max: 0, coss: parseFloat(document.getElementById('lib-mos-coss').value) || 100,
+    ciss: 0, qg: parseFloat(document.getElementById('lib-mos-qg').value) || 30,
+    tr: parseFloat(document.getElementById('lib-mos-tr').value) || 50,
+    tf: parseFloat(document.getElementById('lib-mos-tf').value) || 50,
+    td_on: 20, td_off: 40, vgs_th: 4,
+    package: document.getElementById('lib-mos-pkg').value || '—'
+  });
+  saveUserDB('user_mosfets', userMosfets);
+  populateDropdowns();
+  showLibTab('mosfet');
+}
+
+function deleteUserMosfet(idx) { userMosfets.splice(idx, 1); saveUserDB('user_mosfets', userMosfets); populateDropdowns(); showLibTab('mosfet'); }
+
+// ══════════════════════════════════════════════════════════════
+// COMPARE MODE (Phase 4)
+// ══════════════════════════════════════════════════════════════
+
+const CMP_ROWS = [
+  { grp:'입력 조건' },
+  { label:'Core',          src:'sel-core',       kind:'sel' },
+  { label:'MOSFET',        src:'sel-mosfet',     kind:'sel' },
+  { label:'Pout',          src:'cal-pout',       unit:'W' },
+  { label:'Pin',           src:'cal-pin',        unit:'W',   prefer:'low' },
+  { grp:'턴 설계' },
+  { label:'Np',            src:'inp-np',         kind:'inp', unit:'T' },
+  { label:'Ns',            src:'inp-ns',         kind:'inp', unit:'T' },
+  { label:'n (Np/Ns)',     src:'cal-n' },
+  { label:'Vr',            src:'cal-vr',         unit:'V' },
+  { label:'Lp_set',        src:'inp-lp',         kind:'inp', unit:'μH' },
+  { label:'Lp_mag',        src:'cal-lp-mag',     unit:'μH' },
+  { label:'Air gap',       src:'inp-airgap',     kind:'inp', unit:'mm' },
+  { grp:'동작점' },
+  { label:'D_on',          src:'cal-don',        unit:'%',   prefer:'low' },
+  { label:'D_off',         src:'cal-doff',       unit:'%' },
+  { label:'Ipk',           src:'cal-ipk',        unit:'A',   prefer:'low' },
+  { label:'Ipk_limit',     src:'cal-ipklimit',   unit:'A' },
+  { label:'ΔB',            src:'cal-deltab',     unit:'T',   prefer:'low' },
+  { label:'Flux Margin',   src:'flux-margin-pct',unit:'',    prefer:'high' },
+  { label:'Bsat @Temp',    src:'cal-bsat-temp',  unit:'T' },
+  { label:'Bsat Margin',   src:'cal-bsat-margin',unit:'%',   prefer:'high' },
+  { grp:'VDS 판정' },
+  { label:'VDS_calc',      src:'cal-vds',        unit:'V',   prefer:'low' },
+  { label:'VDS_limit',     src:'cal-vds-limit',  unit:'V' },
+  { grp:'손실 분석' },
+  { label:'MOSFET Cond',   src:'loss-mos-cond-val', prefer:'low' },
+  { label:'MOSFET Switch',  src:'loss-mos-sw-val',  prefer:'low' },
+  { label:'Gate Drive',    src:'loss-gate-val',     prefer:'low' },
+  { label:'Diode',         src:'loss-diode-val',    prefer:'low' },
+  { label:'Copper Pri',    src:'loss-cu-pri-val',   prefer:'low' },
+  { label:'Copper Sec',    src:'loss-cu-sec-val',   prefer:'low' },
+  { label:'Core',          src:'loss-core-val',     prefer:'low' },
+  { label:'Snubber',       src:'loss-snub-val',     prefer:'low' },
+  { label:'Total Loss',    src:'loss-total-val',    prefer:'low' },
+  { label:'η',             src:'loss-eta-val',      prefer:'high' },
+  { label:'MOSFET Pd',     src:'loss-mos-pd-val',   prefer:'low' },
+  { label:'MOSFET Tj',     src:'loss-tj-val',       prefer:'low' },
+  { label:'Window Util',   src:'cal-win-util',  unit:'%' },
+  { grp:'RCD Snubber' },
+  { label:'Llk',           src:'cal-llk',       unit:'μH' },
+  { label:'P_snubber',     src:'cal-psnub',     unit:'W',   prefer:'low' },
+  { label:'R_snub',        src:'cal-rsnub',     unit:'kΩ' },
+  { label:'C_snub',        src:'cal-csnub',     unit:'nF' },
+  { label:'VDS clamped',   src:'cal-vds-clamp', unit:'V',   prefer:'low' },
+  { grp:'판정 결과' },
+  { label:'DCM',           src:'st-dcm',   kind:'status' },
+  { label:'Ipk',           src:'st-ipk',   kind:'status' },
+  { label:'Power',         src:'st-pwr',   kind:'status' },
+  { label:'VDS',           src:'st-vds',   kind:'status' },
+  { label:'Flux',          src:'st-flux',  kind:'status' },
+];
+
+function captureSnapshot() {
+  const snap = {};
+  CMP_ROWS.forEach(row => {
+    if (row.grp) return;
+    const el = document.getElementById(row.src);
+    if (!el) { snap[row.src] = '—'; return; }
+    if (row.kind === 'inp' || row.kind === 'sel') snap[row.src] = el.value;
+    else snap[row.src] = el.textContent;
+  });
+  return snap;
+}
+
+function openCompare() {
+  const presets = loadPresets();
+  const names = Object.keys(presets);
+  ['cmp-sel-a','cmp-sel-b'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    sel.innerHTML = '<option value="">-- 선택 --</option><option value="__current__">현재 상태</option>';
+    names.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+  });
+  document.getElementById('cmp-result').innerHTML = '<div style="padding:20px;text-align:center">프리셋 2개를 선택 후 [비교] 클릭</div>';
+  document.getElementById('modal-cmp').classList.add('active');
+}
+
+function closeCompare() {
+  document.getElementById('modal-cmp').classList.remove('active');
+}
+
+function runCompare() {
+  const nameA = document.getElementById('cmp-sel-a').value;
+  const nameB = document.getElementById('cmp-sel-b').value;
+  if (!nameA || !nameB) {
+    document.getElementById('cmp-result').innerHTML = '<div style="color:var(--c-fail-t);text-align:center;padding:10px">두 프리셋을 모두 선택하세요</div>';
+    return;
+  }
+
+  const presets = loadPresets();
+  const savedState = getAllInputValues();
+  const snapCurrent = captureSnapshot();
+
+  let snapA;
+  if (nameA === '__current__') {
+    snapA = snapCurrent;
+  } else {
+    if (!presets[nameA]) { document.getElementById('cmp-result').textContent = 'Preset A 없음'; return; }
+    setAllInputValues(presets[nameA]);
+    updateAll();
+    snapA = captureSnapshot();
+  }
+
+  let snapB;
+  if (nameB === '__current__') {
+    if (nameA !== '__current__') {
+      setAllInputValues(savedState);
+      updateAll();
+    }
+    snapB = captureSnapshot();
+  } else {
+    if (!presets[nameB]) { document.getElementById('cmp-result').textContent = 'Preset B 없음'; return; }
+    setAllInputValues(presets[nameB]);
+    updateAll();
+    snapB = captureSnapshot();
+  }
+
+  setAllInputValues(savedState);
+  updateAll();
+
+  const labelA = nameA === '__current__' ? '현재' : nameA;
+  const labelB = nameB === '__current__' ? '현재' : nameB;
+  renderCompareTable(snapA, snapB, labelA, labelB);
+}
+
+function fmtDelta(d) {
+  const a = Math.abs(d);
+  let s;
+  if (a >= 100) s = d.toFixed(0);
+  else if (a >= 1) s = d.toFixed(2);
+  else if (a >= 0.001) s = d.toFixed(4);
+  else s = d.toExponential(2);
+  return (d > 0 ? '+' : '') + s;
+}
+
+function renderCompareTable(snapA, snapB, labelA, labelB) {
+  const showInput = document.getElementById('cmp-show-input').checked;
+
+  let html = `<table class="cmp"><thead><tr>
+    <th style="width:24%">Parameter</th>
+    <th style="width:24%;background:#2a5090">${labelA}</th>
+    <th style="width:24%;background:#903050">${labelB}</th>
+    <th style="width:28%">Δ (B−A)</th>
+  </tr></thead><tbody>`;
+
+  CMP_ROWS.forEach(row => {
+    if (row.grp) {
+      html += `<tr class="cmp-grp"><td colspan="4">${row.grp}</td></tr>`;
+      return;
+    }
+    if (!showInput && (row.kind === 'inp' || row.kind === 'sel')) return;
+
+    const valA = snapA[row.src] || '—';
+    const valB = snapB[row.src] || '—';
+    const numA = parseFloat(valA);
+    const numB = parseFloat(valB);
+    const hasNum = !isNaN(numA) && !isNaN(numB);
+
+    let deltaStr = '—';
+    let deltaClass = 'cmp-delta';
+    let clsA = '', clsB = '';
+
+    if (hasNum && row.prefer && Math.abs(numA - numB) > 1e-6) {
+      const delta = numB - numA;
+      deltaStr = fmtDelta(delta);
+      deltaClass = 'cmp-delta ' + (delta > 0 ? 'pos' : 'neg');
+
+      if (row.prefer === 'low') {
+        clsA = delta > 0 ? 'cmp-better' : 'cmp-worse';
+        clsB = delta > 0 ? 'cmp-worse' : 'cmp-better';
+      } else {
+        clsA = delta > 0 ? 'cmp-worse' : 'cmp-better';
+        clsB = delta > 0 ? 'cmp-better' : 'cmp-worse';
+      }
+    } else if (row.kind === 'status') {
+      clsA = valA === 'PASS' ? 'cmp-better' : valA === 'FAIL' ? 'cmp-worse' : '';
+      clsB = valB === 'PASS' ? 'cmp-better' : valB === 'FAIL' ? 'cmp-worse' : '';
+      deltaStr = valA === valB ? '=' : '≠';
+    } else if (hasNum && Math.abs(numA - numB) > 1e-6) {
+      deltaStr = fmtDelta(numB - numA);
+    }
+
+    html += `<tr>
+      <td class="cmp-lbl">${row.label}</td>
+      <td class="${clsA}">${valA}</td>
+      <td class="${clsB}">${valB}</td>
+      <td class="${deltaClass}">${deltaStr}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('cmp-result').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+
+function init() {
+  populateDropdowns();
+  renderWireTable();
+  refreshPresetSelect();
+
+  // Event listeners
+  document.getElementById('sel-core').addEventListener('change', onCoreChange);
+  document.getElementById('sel-mosfet').addEventListener('change', onMosfetChange);
+  document.getElementById('btn-preset-save').addEventListener('click', savePreset);
+  document.getElementById('btn-preset-del').addEventListener('click', deletePreset);
+  document.getElementById('preset-select').addEventListener('change', loadSelectedPreset);
+
+  // All input/select changes trigger recalc
+  document.querySelectorAll('.td-inp input, .td-key input, .td-inp select').forEach(el => {
+    el.addEventListener('input', updateAll);
+    el.addEventListener('change', updateAll);
+  });
+
+  // Initial calc
+  onCoreChange();
+  onMosfetChange();
+  updateAll();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
