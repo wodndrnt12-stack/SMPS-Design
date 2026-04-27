@@ -1,0 +1,14 @@
+[project]
+name = "smps-transformer-designer"
+version = "0.2.0"
+description = "DCM Flyback SMPS Transformer Design Tool (No API/LLM required)"
+requires-python = ">=3.10"
+dependencies = [
+    "streamlit>=1.30",
+    "pandas>=2.0",
+    "openpyxl>=3.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
