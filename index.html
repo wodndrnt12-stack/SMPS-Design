@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <title>DCM Flyback Transformer Designer</title>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <style>
 /* ============================================================
    DCM Flyback Transformer Designer — Phase 1
@@ -90,6 +92,18 @@ body { font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; color: var(--text);
 #center { width: 25%; overflow-y: auto; padding: 10px 12px; background: var(--surface); border-right: 1px solid var(--border); }
 #right { width: 25%; overflow-y: auto; padding: 8px 10px; background: var(--surface); }
 #bottom-wire { height: 220px; min-height: 150px; overflow-y: auto; border-top: 2px solid var(--border2); background: var(--white); padding: 0; resize: vertical; }
+#xformer-section { border-top: 2px solid var(--border2); background: #1a1a2e; padding: 0; }
+#xformer-section .sec-hdr { display:flex; align-items:center; gap:10px; background:var(--sub1); color:#ddeeff; padding:4px 12px; font-size:10px; font-weight:600; text-transform:uppercase; }
+#xformer-section .sec-hdr .xf-controls { margin-left:12px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+#xformer-section .sec-hdr .xf-btn { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:#ddeeff; padding:2px 8px; border-radius:3px; font-size:9px; cursor:pointer; }
+#xformer-section .sec-hdr .xf-btn:hover { background:rgba(255,255,255,0.25); }
+#xformer-section .sec-hdr .xf-btn.active { background:rgba(100,200,255,0.3); border-color:rgba(100,200,255,0.5); }
+#xformer-canvas { width:100%; height:360px; display:block; cursor:grab; }
+#xformer-canvas:active { cursor:grabbing; }
+#xformer-legend { position:absolute; bottom:8px; left:10px; background:rgba(0,0,0,0.7); color:#ccc; padding:6px 10px; border-radius:4px; font-size:9px; line-height:1.6; pointer-events:none; }
+#xformer-legend .leg-item { display:flex; align-items:center; gap:5px; }
+#xformer-legend .leg-dot { width:10px; height:10px; border-radius:2px; display:inline-block; }
+#xformer-info { position:absolute; top:8px; right:10px; background:rgba(0,0,0,0.7); color:#aaffaa; padding:6px 10px; border-radius:4px; font-size:10px; font-family:monospace; pointer-events:none; }
 
 /* ── TABLE SYSTEM ── */
 .xtable { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 10px; }
@@ -235,7 +249,13 @@ body { font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; color: var(--text);
 .stress-limit-line { position: absolute; top: 0; height: 100%; width: 2px; background: #c04820; }
 
 /* ── PAGE 2: WINDING TABLE ── */
-#page2 { min-height: 100vh; padding: 20px; background: var(--bg); }
+#page2 { height: calc(100vh - 40px); background: #1a1a2e; }
+#page2 #xformer-section { height: 100%; display: flex; flex-direction: column; }
+#page2 #xformer-canvas { flex: 1; width: 100%; }
+.page-tabs { display: flex; gap: 2px; margin-left: 12px; align-items: center; }
+.page-tab { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #8899bb; padding: 3px 14px; border-radius: 4px 4px 0 0; font-size: 10px; cursor: pointer; font-weight: 600; }
+.page-tab:hover { background: rgba(255,255,255,0.15); color: #bbccee; }
+.page-tab.active { background: rgba(100,200,255,0.2); border-color: rgba(100,200,255,0.4); color: #ddeeff; }
 .page-title { font-size: 14px; font-weight: 700; color: var(--hdr); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--sub1); }
 #wire-sec { background: var(--white); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 .wire-strip {
@@ -323,7 +343,7 @@ table.cmp .cmp-grp td { background:var(--sub2) !important; color:#ddeeff; font-w
   <div id="hdr">
     <div class="brand">
       <div class="title">DCM Flyback Transformer Design</div>
-      <div class="sub">SMPS Design Tool · v0.02</div>
+      <div class="sub">SMPS Design Tool · v0.03</div>
     </div>
     <div class="divider"></div>
     <div class="meta" id="hdr-meta">EE2020 · 7.47W · 300~850V DC</div>
@@ -335,6 +355,10 @@ table.cmp .cmp-grp td { background:var(--sub2) !important; color:#ddeeff; font-w
       <div class="divider"></div>
       <button class="btn btn-lib" id="btn-lib" onclick="openLibrary()">Library</button>
       <button class="btn btn-cmp" onclick="openCompare()">Compare</button>
+    </div>
+    <div class="page-tabs">
+      <button class="page-tab active" data-page="page1" onclick="switchPage('page1')">Design</button>
+      <button class="page-tab" data-page="page2" onclick="switchPage('page2')">3D View</button>
     </div>
   </div>
 
@@ -641,6 +665,20 @@ table.cmp .cmp-grp td { background:var(--sub2) !important; color:#ddeeff; font-w
           <div style="font-size:9px; color:var(--dim); padding:2px 0;" id="snub-vclamp-warn"></div>
         </div>
       </div>
+      <div class="section-box">
+        <div class="section-title">Safety — IEC 62368-1</div>
+        <table class="xtable" style="margin:0">
+          <tbody>
+            <tr><td class="td-lbl">AC Input</td><td class="td-inp"><input id="inp-vac" value="230"></td><td class="td-unit">Vrms</td><td class="td-note">정격 입력</td></tr>
+            <tr><td class="td-lbl">Insulation</td><td class="td-cal" id="cal-ins-class">—</td><td class="td-unit"></td><td class="td-note">from Wire Type</td></tr>
+            <tr><td class="td-lbl">CTI Group</td><td class="td-inp">
+              <select id="sel-cti"><option value="I">I (600+)</option><option value="II">II (400-600)</option><option value="IIIa" selected>IIIa (175-400)</option><option value="IIIb">IIIb (100-175)</option></select>
+            </td><td class="td-unit"></td><td class="td-note">보빈 소재</td></tr>
+            <tr><td class="td-lbl">Margin Tape</td><td class="td-inp"><input id="inp-margin-tape" value="3.2"></td><td class="td-unit">mm</td><td class="td-note">편측</td></tr>
+          </tbody>
+        </table>
+        <div id="safety-results" style="padding:4px 0;"></div>
+      </div>
     </div>
    </div><!-- /top-panels -->
 
@@ -669,7 +707,40 @@ table.cmp .cmp-grp td { background:var(--sub2) !important; color:#ddeeff; font-w
         </table>
       </div>
     </div>
+
   </div><!-- /page1 -->
+
+  <!-- PAGE 2: 3D VIEW -->
+  <div id="page2" style="display:none;">
+    <div id="xformer-section" style="position:relative;">
+      <div class="sec-hdr">
+        ⑦ Transformer 3D View
+        <div class="xf-controls">
+          <button class="xf-btn" onclick="xf3d.toggleTransparent()" id="btn-xf-transparent">Transparent</button>
+          <button class="xf-btn" onclick="xf3d.toggleExplode()" id="btn-xf-explode">Explode</button>
+          <button class="xf-btn" onclick="xf3d.toggleCutView()" id="btn-xf-cut">Cut</button>
+          <button class="xf-btn" onclick="xf3d.toggleDimensions()" id="btn-xf-dims">Dimensions</button>
+          <button class="xf-btn" onclick="xf3d.toggleSection()" id="btn-xf-section">Section</button>
+          <button class="xf-btn" onclick="xf3d.toggleMMF()" id="btn-xf-mmf">MMF</button>
+          <span style="border-left:1px solid rgba(255,255,255,0.2);height:16px;margin:0 4px"></span>
+          <button class="xf-btn" onclick="xf3d.toggleSkinDepth()" id="btn-xf-skin">Skin δ</button>
+          <button class="xf-btn" onclick="xf3d.toggleParasiticCp()" id="btn-xf-cp">Cp</button>
+          <span style="border-left:1px solid rgba(255,255,255,0.2);height:16px;margin:0 4px"></span>
+          <button class="xf-btn" onclick="xf3d.resetCamera()">Reset View</button>
+          <span style="border-left:1px solid rgba(255,255,255,0.2);height:16px;margin:0 4px"></span>
+          <button class="xf-btn" onclick="xf3d.toggleMeasure()" id="btn-xf-measure">Measure</button>
+          <button class="xf-btn" onclick="xf3d.clearMeasurements()">Clear</button>
+          <button class="xf-btn" onclick="xf3d.exportPNG()">PNG</button>
+        </div>
+      </div>
+      <canvas id="xformer-canvas"></canvas>
+      <canvas id="xf-section-canvas" style="display:none;position:absolute;bottom:8px;right:10px;border:1px solid rgba(100,200,255,0.3);border-radius:6px;pointer-events:none;"></canvas>
+      <canvas id="xf-mmf-canvas" style="display:none;position:absolute;bottom:8px;left:10px;border:1px solid rgba(255,100,68,0.3);border-radius:6px;pointer-events:none;"></canvas>
+      <div id="xf-tooltip" style="display:none;position:absolute;pointer-events:none;background:rgba(10,12,28,0.94);border:1px solid rgba(100,200,255,0.35);border-radius:6px;padding:8px 12px;font:11px monospace;color:#ccddef;z-index:100;max-width:280px;line-height:1.6;box-shadow:0 4px 16px rgba(0,0,0,0.5)"></div>
+      <div id="xformer-legend"></div>
+      <div id="xformer-info"></div>
+    </div>
+  </div><!-- /page2 -->
 
 </div>
 
@@ -715,16 +786,26 @@ table.cmp .cmp-grp td { background:var(--sub2) !important; color:#ddeeff; font-w
 // ══════════════════════════════════════════════════════════════
 
 const CORE_DB = [
-  { name:"EE10",  ae:12.1, le:26.1, ve:316,  al_zero:850,  aw:11.2, bobbin_h:5.5,  bsat:0.39, material:"PC47", type:"EE" },
-  { name:"EE13",  ae:17.1, le:30.2, ve:516,  al_zero:1130, aw:15.4, bobbin_h:7.0,  bsat:0.39, material:"PC47", type:"EE" },
-  { name:"EE16",  ae:19.0, le:34.5, ve:680,  al_zero:1140, aw:19.7, bobbin_h:8.0,  bsat:0.39, material:"PC47", type:"EE" },
-  { name:"EE19",  ae:23.0, le:39.4, ve:900,  al_zero:1250, aw:26.2, bobbin_h:9.0,  bsat:0.39, material:"PC47", type:"EE" },
-  { name:"EE2020",ae:30.5, le:43.0, ve:1340, al_zero:1550, aw:28.0, bobbin_h:12.4, bsat:0.39, material:"PC40", type:"EE" },
-  { name:"EE22",  ae:41.1, le:39.2, ve:1610, al_zero:1600, aw:37.8, bobbin_h:10.0, bsat:0.39, material:"PC40", type:"EE" },
-  { name:"EE25",  ae:40.2, le:49.4, ve:1990, al_zero:1900, aw:44.2, bobbin_h:12.2, bsat:0.39, material:"PC40", type:"EE" },
-  { name:"EI16",  ae:19.8, le:33.0, ve:653,  al_zero:1100, aw:18.0, bobbin_h:8.0,  bsat:0.39, material:"PC40", type:"EI" },
-  { name:"EI19",  ae:24.0, le:39.6, ve:950,  al_zero:1250, aw:24.0, bobbin_h:9.5,  bsat:0.39, material:"PC40", type:"EI" },
-  { name:"EI22",  ae:42.0, le:39.3, ve:1651, al_zero:1600, aw:36.0, bobbin_h:10.0, bsat:0.39, material:"PC40", type:"EI" },
+  { name:"EE10",  ae:12.1, le:26.1, ve:316,  al_zero:850,  aw:11.2, bobbin_h:5.5,  win_w:2.7,  bsat:0.53, material:"PC47", type:"EE",
+    bobbin:{ pins:8,  pitch:2.54, margin:0.5, wall:0.35, flangeThk:0.7, coreW:10.2, coreH:11.0, centerW:3.6, desc:"EE10 vertical 4+4pin" } },
+  { name:"EE13",  ae:17.1, le:30.2, ve:516,  al_zero:1130, aw:15.4, bobbin_h:7.0,  win_w:3.1,  bsat:0.53, material:"PC47", type:"EE",
+    bobbin:{ pins:10, pitch:2.54, margin:0.5, wall:0.40, flangeThk:0.8, coreW:13.0, coreH:14.5, centerW:4.5, desc:"EE13 vertical 5+5pin" } },
+  { name:"EE16",  ae:19.0, le:34.5, ve:680,  al_zero:1140, aw:19.7, bobbin_h:8.0,  win_w:3.5,  bsat:0.53, material:"PC47", type:"EE",
+    bobbin:{ pins:10, pitch:2.54, margin:0.6, wall:0.40, flangeThk:0.8, coreW:16.0, coreH:17.5, centerW:5.0, desc:"EE16 vertical 5+5pin" } },
+  { name:"EE19",  ae:23.0, le:39.4, ve:900,  al_zero:1250, aw:26.2, bobbin_h:9.0,  win_w:4.1,  bsat:0.53, material:"PC47", type:"EE",
+    bobbin:{ pins:10, pitch:2.54, margin:0.7, wall:0.45, flangeThk:0.9, coreW:19.0, coreH:20.0, centerW:6.0, desc:"EE19 vertical 5+5pin" } },
+  { name:"EE2020",ae:30.5, le:43.0, ve:1340, al_zero:1550, aw:28.0, bobbin_h:12.4, win_w:4.7,  bsat:0.39, material:"PC40", type:"EE",
+    bobbin:{ pins:12, pitch:2.54, margin:0.8, wall:0.50, flangeThk:1.0, coreW:20.0, coreH:20.0, centerW:7.0, desc:"EE2020 vertical 6+6pin" } },
+  { name:"EE22",  ae:41.1, le:39.2, ve:1610, al_zero:1600, aw:37.8, bobbin_h:10.0, win_w:5.4,  bsat:0.39, material:"PC40", type:"EE",
+    bobbin:{ pins:12, pitch:2.54, margin:0.8, wall:0.50, flangeThk:1.0, coreW:22.0, coreH:22.0, centerW:8.0, desc:"EE22 vertical 6+6pin" } },
+  { name:"EE25",  ae:40.2, le:49.4, ve:1990, al_zero:1900, aw:44.2, bobbin_h:12.2, win_w:5.7,  bsat:0.39, material:"PC40", type:"EE",
+    bobbin:{ pins:12, pitch:2.54, margin:0.8, wall:0.50, flangeThk:1.0, coreW:25.4, coreH:25.4, centerW:8.6, desc:"EE25 vertical 6+6pin" } },
+  { name:"EI16",  ae:19.8, le:33.0, ve:653,  al_zero:1100, aw:18.0, bobbin_h:8.0,  win_w:3.2,  bsat:0.39, material:"PC40", type:"EI",
+    bobbin:{ pins:10, pitch:2.54, margin:0.5, wall:0.40, flangeThk:0.8, coreW:16.0, coreH:15.5, centerW:5.0, desc:"EI16 vertical 5+5pin" } },
+  { name:"EI19",  ae:24.0, le:39.6, ve:950,  al_zero:1250, aw:24.0, bobbin_h:9.5,  win_w:3.8,  bsat:0.39, material:"PC40", type:"EI",
+    bobbin:{ pins:10, pitch:2.54, margin:0.7, wall:0.45, flangeThk:0.9, coreW:19.0, coreH:19.0, centerW:6.0, desc:"EI19 vertical 5+5pin" } },
+  { name:"EI22",  ae:42.0, le:39.3, ve:1651, al_zero:1600, aw:36.0, bobbin_h:10.0, win_w:5.2,  bsat:0.39, material:"PC40", type:"EI",
+    bobbin:{ pins:12, pitch:2.54, margin:0.8, wall:0.50, flangeThk:1.0, coreW:22.0, coreH:22.0, centerW:8.0, desc:"EI22 vertical 6+6pin" } },
 ];
 
 const IC_DB = [
@@ -742,15 +823,37 @@ const STEINMETZ = {
   "PC47": { k: 1.4e-3, a: 1.46, b: 2.67 },
 };
 
-// Bsat temperature derating (linear approx from TDK data)
-// Bsat(T) = Bsat_25 * (1 - derating_coeff * (T - 25))
-const BSAT_DERATING = {
-  "PC40": 0.0020,  // ~0.2%/°C → 0.39T @25°C → ~0.33T @100°C
-  "PC47": 0.0018,
+// Bsat vs Temperature lookup (TDK datasheet, @1194 A/m)
+// Piecewise linear interpolation between data points
+const BSAT_TEMP_TABLE = {
+  "PC40": [
+    { t:25, b:0.390 }, { t:60, b:0.360 }, { t:80, b:0.330 },
+    { t:100, b:0.280 }, { t:120, b:0.230 },
+  ],
+  "PC47": [
+    { t:25, b:0.530 }, { t:60, b:0.480 }, { t:80, b:0.450 },
+    { t:100, b:0.380 }, { t:120, b:0.320 },
+  ],
 };
+function getBsatAtTemp(material, tempC) {
+  const tbl = BSAT_TEMP_TABLE[material];
+  if (!tbl) return 0.39;
+  if (tempC <= tbl[0].t) return tbl[0].b;
+  if (tempC >= tbl[tbl.length-1].t) return tbl[tbl.length-1].b;
+  for (let i = 0; i < tbl.length - 1; i++) {
+    if (tempC >= tbl[i].t && tempC <= tbl[i+1].t) {
+      const ratio = (tempC - tbl[i].t) / (tbl[i+1].t - tbl[i].t);
+      return tbl[i].b + ratio * (tbl[i+1].b - tbl[i].b);
+    }
+  }
+  return tbl[tbl.length-1].b;
+}
 
 // Wire DB: bare φ, 2UEW coated φ (JIS C 3202 Grade2), TIW coated φ (TEX-E 기준)
 const WIRE_DB = [
+  { bare:0.10, coat_2uew:0.122, coat_tiw:0.250 },
+  { bare:0.12, coat_2uew:0.145, coat_tiw:0.270 },
+  { bare:0.14, coat_2uew:0.167, coat_tiw:0.290 },
   { bare:0.16, coat_2uew:0.189, coat_tiw:0.305 },
   { bare:0.18, coat_2uew:0.210, coat_tiw:0.325 },
   { bare:0.20, coat_2uew:0.232, coat_tiw:0.350 },
@@ -761,6 +864,13 @@ const WIRE_DB = [
   { bare:0.32, coat_2uew:0.360, coat_tiw:0.475 },
   { bare:0.35, coat_2uew:0.391, coat_tiw:0.510 },
   { bare:0.40, coat_2uew:0.443, coat_tiw:0.560 },
+  { bare:0.45, coat_2uew:0.495, coat_tiw:0.615 },
+  { bare:0.50, coat_2uew:0.547, coat_tiw:0.670 },
+  { bare:0.55, coat_2uew:0.600, coat_tiw:0.725 },
+  { bare:0.60, coat_2uew:0.652, coat_tiw:0.780 },
+  { bare:0.70, coat_2uew:0.756, coat_tiw:0.890 },
+  { bare:0.80, coat_2uew:0.860, coat_tiw:1.000 },
+  { bare:1.00, coat_2uew:1.068, coat_tiw:1.220 },
 ];
 
 function getWireCoat(bare, type) {
@@ -1007,24 +1117,101 @@ function removeChannel(id) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// IEC 62368-1 SAFETY TABLE (Reinforced, PD2)
+// ══════════════════════════════════════════════════════════════
+
+const IEC_REINF_PD2 = [
+  { v: 50,  cl: 0.2, cr: { I:0.6,  II:0.85, IIIa:1.0, IIIb:1.2 } },
+  { v: 100, cl: 0.6, cr: { I:1.4,  II:1.7,  IIIa:2.0, IIIb:2.2 } },
+  { v: 150, cl: 0.8, cr: { I:1.6,  II:2.0,  IIIa:2.5, IIIb:2.8 } },
+  { v: 200, cl: 1.0, cr: { I:2.0,  II:2.5,  IIIa:3.2, IIIb:3.2 } },
+  { v: 250, cl: 1.25,cr: { I:2.5,  II:3.2,  IIIa:4.0, IIIb:4.0 } },
+  { v: 300, cl: 1.5, cr: { I:3.2,  II:4.0,  IIIa:5.0, IIIb:5.0 } },
+  { v: 400, cl: 3.0, cr: { I:3.6,  II:4.0,  IIIa:5.0, IIIb:5.0 } },
+  { v: 600, cl: 5.5, cr: { I:6.5,  II:6.5,  IIIa:6.5, IIIb:6.5 } },
+];
+
+function lookupIEC(vac, ctiGroup) {
+  const row = IEC_REINF_PD2.find(r => vac <= r.v) || IEC_REINF_PD2[IEC_REINF_PD2.length - 1];
+  return { clearance: row.cl, creepage: row.cr[ctiGroup] || row.cr.IIIa };
+}
+
+function calcSafety(wireType, vac, ctiGroup, marginTape, bobbinH, barrier, winW, usedR) {
+  const isTIW = wireType === 'TIW';
+  const req = lookupIEC(vac, ctiGroup);
+  const results = [];
+
+  if (isTIW) {
+    results.push({
+      name: 'Wire Insulation',
+      status: 'PASS',
+      note: 'TIW = Reinforced per wire',
+      margin: '—'
+    });
+    results.push({
+      name: 'Winding Creepage',
+      status: 'N/A',
+      note: 'TIW: creepage between windings not required',
+      margin: '—'
+    });
+  } else {
+    const actualMargin = marginTape || 0;
+    const marginPass = actualMargin >= req.creepage;
+    results.push({
+      name: 'Margin Tape',
+      status: marginPass ? 'PASS' : 'FAIL',
+      required: req.creepage.toFixed(1) + 'mm',
+      actual: actualMargin.toFixed(1) + 'mm',
+      margin: ((actualMargin - req.creepage) / req.creepage * 100).toFixed(0) + '%',
+      note: marginPass ? '' : 'Increase margin tape or use TIW'
+    });
+  }
+
+  const pinCreepage = bobbinH > 0 ? (bobbinH - (barrier || 0)) * 0.8 : 0;
+  const pinPass = pinCreepage >= req.creepage;
+  results.push({
+    name: 'Pin Creepage',
+    status: pinPass ? 'PASS' : 'FAIL',
+    required: req.creepage.toFixed(1) + 'mm',
+    actual: pinCreepage.toFixed(1) + 'mm',
+    margin: ((pinCreepage - req.creepage) / req.creepage * 100).toFixed(0) + '%',
+    note: 'Bobbin pin-to-pin (est.)'
+  });
+
+  const clearActual = Math.max(winW - usedR, 0);
+  const clearPass = clearActual >= req.clearance;
+  results.push({
+    name: 'Window Clearance',
+    status: clearPass ? 'PASS' : 'WARN',
+    required: req.clearance.toFixed(1) + 'mm',
+    actual: clearActual.toFixed(1) + 'mm',
+    margin: clearActual > 0 ? ((clearActual - req.clearance) / req.clearance * 100).toFixed(0) + '%' : '—',
+    note: 'Remaining window gap'
+  });
+
+  const overallPass = results.every(r => r.status === 'PASS' || r.status === 'N/A');
+  return { req, results, overallPass, isTIW };
+}
+
+// ══════════════════════════════════════════════════════════════
 // MAIN CALCULATION ENGINE — Excel 2안 수식
 // ══════════════════════════════════════════════════════════════
 
 function updateAll() {
   // 1. Read inputs
-  const eff = getVal('inp-eff', 0.8);
-  const Vin_min = getVal('inp-vinmin', 300);
-  const Vin_max = getVal('inp-vinmax', 850);
-  const Fsw_kHz = getVal('inp-fsw', 60);
+  const eff = Math.max(getVal('inp-eff', 0.8), 0.01);
+  const Vin_min = Math.max(getVal('inp-vinmin', 300), 1);
+  const Vin_max = Math.max(getVal('inp-vinmax', 850), 1);
+  const Fsw_kHz = Math.max(getVal('inp-fsw', 60), 1);
   const Fsw = Fsw_kHz * 1e3;
   const VD_F = getVal('inp-vdf', 0.9);
-  const Np = getVal('inp-np', 90);
-  const Ns = getVal('inp-ns', 10);
+  const Np = Math.max(getVal('inp-np', 90), 1);
+  const Ns = Math.max(getVal('inp-ns', 10), 1);
   const V_spike = getVal('inp-vspike', 200);
   const Lp_set = getVal('inp-lp', 1050);
   const Lp = Lp_set * 1e-6;
-  const airgap = getVal('inp-airgap', 0.3);
-  const BM_set = getVal('inp-bmset', 0.3);
+  const airgap = Math.max(getVal('inp-airgap', 0.3), 0.01);
+  const BM_set = Math.max(getVal('inp-bmset', 0.3), 0.001);
   const wireType = document.getElementById('sel-wiretype').value;
   const wireBare = parseFloat(document.getElementById('sel-wiresize').value) || 0.2;
   const wireCoat = getWireCoat(wireBare, wireType);
@@ -1074,19 +1261,17 @@ function updateAll() {
   const gap_m = airgap * 1e-3;
   const Lp_mag = (mu0 * Np * Np * Ae_m2 / gap_m) * 1e6;
 
-  // D_on (from Lp_mag for initial calc)
+  // D_on (from Lp_mag for reference)
   const Lp_for_Don = Lp_mag * 1e-6;
   const D_on_init = Math.sqrt(2 * Pin * Lp_for_Don * Fsw) / Vin_min;
 
-  // n lower (DCM condition, using calculated duty)
-  const n_lower = Vin_min / ((Vout + VD_F) * (1 / D_on_init - 1));
-
-  // Lp energy
-  const Lp_eng = (Vin_min * Vin_min * D_on_init * D_on_init) / (2 * Pin * Fsw) * 1e6;
-
-  // D_on with Lp_set
+  // Lp energy (independent: from Lp_set, not Lp_mag)
   const D_on = Math.sqrt(2 * Pin * Lp * Fsw) / Vin_min;
-  const D_off = D_on * Vin_min / Vr;
+  const Lp_eng = (Vin_min * Vin_min * D_on * D_on) / (2 * Pin * Fsw) * 1e6;
+
+  // n lower (DCM condition, using Lp_set-based D_on)
+  const n_lower = D_on < 1 ? Vin_min / ((Vout + VD_F) * (1 / D_on - 1)) : Infinity;
+  const D_off = Vr > 0 ? D_on * Vin_min / Vr : 0;
   const D_sum = D_on + D_off;
   const D_dead = Math.max(1 - D_sum, 0);
   const isDCM = D_sum < 1;
@@ -1108,17 +1293,16 @@ function updateAll() {
   const delta_B = (Lp * Ipk) / (Np * Ae_m2);
 
   // Wire
-  const windingH = bobbinH - barrier;
-  const maxTurns = Math.floor(windingH / wireCoat);
+  const windingH = Math.max(bobbinH - barrier, 0.1);
+  const maxTurns = Math.floor(windingH / Math.max(wireCoat, 0.01));
 
   // Flux margin
   const fluxUsedPct = (delta_B / BM_set) * 100;
   const fluxMarginPct = 100 - fluxUsedPct;
 
-  // Bsat temperature derating
+  // Bsat temperature derating (piecewise linear from TDK datasheet)
   const material = core.material;
-  const derateCoeff = BSAT_DERATING[material] || 0.002;
-  const bsat_temp = core.bsat * (1 - derateCoeff * Math.max(opTemp - 25, 0));
+  const bsat_temp = getBsatAtTemp(material, opTemp);
   const bsat_margin_temp = ((bsat_temp - delta_B) / bsat_temp) * 100;
 
   // ═══════════════════════════════════════════════════════════
@@ -1129,13 +1313,14 @@ function updateAll() {
   const Rg = getVal('inp-rg', 4.7);
 
   // MOSFET conduction loss: Irms² × Rds_on (온도 보정: +0.4%/°C)
-  const Rdson_temp = Rdson * (1 + 0.004 * Math.max(opTemp - 25, 0));
+  const Rdson_temp = Rdson * (1 + 0.004 * (opTemp - 25));
   const P_mos_cond = Ip_rms * Ip_rms * Rdson_temp;
 
-  // MOSFET switching loss: 0.5 × Vds × Id × (tr + tf) × Fsw
+  // MOSFET switching loss: turn-off uses Vin+Vr (spike is after transition)
   const tr_s = (mos.tr || 47) * 1e-9;
   const tf_s = (mos.tf || 61) * 1e-9;
-  const P_mos_sw = 0.5 * VDS_calc * Ipk * (tr_s + tf_s) * Fsw;
+  const V_sw = Vin_max + Vr;
+  const P_mos_sw = 0.5 * V_sw * Ipk * (tr_s + tf_s) * Fsw;
 
   // Gate drive loss: Qg × Vgs × Fsw
   const Qg = (mos.qg || 29.3) * 1e-9;
@@ -1153,7 +1338,7 @@ function updateAll() {
   // Layer count and mean turn length
   const turnsPerLayer = maxTurns;
   const priLayers = Math.ceil(Np / Math.max(turnsPerLayer, 1));
-  const meanPerim_pri = corePerim + (priLayers - 1) * wireBare * Math.PI;
+  const meanPerim_pri = corePerim + (priLayers - 1) * wireCoat * 2;
   const wireLen_pri = Np * meanPerim_pri * 1e-3;
   const R_pri = rho_cu * wireLen_pri / wireArea_pri;
   const P_cu_pri = Ip_rms * Ip_rms * R_pri;
@@ -1164,11 +1349,15 @@ function updateAll() {
   secondaryChannels.forEach(ch => {
     const ns_turns = ch.ns || 10;
     totalSecTurns += ns_turns;
-    const Is_peak = ch.io * 2 / D_off;
-    const Is_rms = Is_peak * Math.sqrt(D_off / 3);
+    const n_ch = Np / ns_turns;
+    const Vr_ch = n_ch * (Math.abs(ch.vo) + VD_F);
+    const D_off_ch = Vr_ch > 0 ? D_on * Vin_min / Vr_ch : 0;
+    const Is_peak = D_off_ch > 0 ? ch.io * 2 / D_off_ch : 0;
+    const Is_rms = Is_peak * Math.sqrt(D_off_ch / 3);
     const wireA_sec = Math.PI * Math.pow(ch.dia / 2 * 1e-3, 2);
-    const secLayerOffset = priLayers * wireCoat;
-    const meanPerim_sec = corePerim + secLayerOffset * Math.PI;
+    const tapeThickness = 0.2;
+    const secLayerOffset = priLayers * wireCoat + tapeThickness;
+    const meanPerim_sec = corePerim + secLayerOffset * 2;
     const wireL_sec = ns_turns * meanPerim_sec * 1e-3;
     const R_sec = rho_cu * wireL_sec / wireA_sec;
     P_cu_sec += Is_rms * Is_rms * R_sec;
@@ -1419,10 +1608,14 @@ function updateAll() {
   secondaryChannels.forEach(ch => {
     const ns = ch.ns || 10;
     const vo_abs = Math.abs(ch.vo);
-    const Is_peak = ch.io * 2 / D_off;
-    const Is_rms = Is_peak * Math.sqrt(D_off / 3);
+    const n_ch = Np / ns;
+    const Vr_ch = n_ch * (vo_abs + VD_F);
+    const D_off_ch = Vr_ch > 0 ? D_on * Vin_min / Vr_ch : 0;
+    const Is_peak = D_off_ch > 0 ? ch.io * 2 / D_off_ch : 0;
+    const Is_rms = Is_peak * Math.sqrt(D_off_ch / 3);
     const ns_calc = Np * (vo_abs + VD_F) / Vr;
-    const vo_calc = (ns * Vr / Np) - VD_F;
+    const vo_calc_abs = (ns * Vr / Np) - VD_F;
+    const vo_calc = ch.vo < 0 ? -vo_calc_abs : vo_calc_abs;
     const vrrm = Vin_max / (Np / ns) + vo_abs;
     const wireArea_set = Math.PI * Math.pow(ch.dia / 2, 2);
     const wireArea_calc = Is_rms / jDensity;
@@ -1442,6 +1635,1125 @@ function updateAll() {
       mEl.className = margin >= 0 ? 'mp' : 'mf';
     }
   });
+
+  xf3d.update(core, Np, wireCoat, priLayers, secondaryChannels, wireType, barrier, wireBare);
+
+  // Safety check
+  const vac = getVal('inp-vac', 230);
+  const ctiGroup = document.getElementById('sel-cti')?.value || 'IIIa';
+  const marginTapeVal = getVal('inp-margin-tape', 3.2);
+  const insEl = document.getElementById('cal-ins-class');
+  if (insEl) insEl.textContent = wireType === 'TIW' ? 'Reinforced (TIW)' : 'Basic (2UEW)';
+
+  const usedR_s = priLayers * wireCoat;
+  let totalUsed = usedR_s;
+  secondaryChannels.forEach(ch => {
+    const chCoat = getWireCoat(ch.wireSize || ch.dia, wireType);
+    const ns = ch.ns || 10;
+    const tpl = Math.max(Math.floor((bobbinH - barrier) / Math.max(chCoat, 0.01)), 1);
+    totalUsed += Math.ceil(ns / tpl) * chCoat;
+  });
+  totalUsed += 0.15 * (secondaryChannels.length + 1);
+
+  const safety = calcSafety(wireType, vac, ctiGroup, marginTapeVal, bobbinH, barrier, core.win_w || 4, totalUsed);
+  const safetyEl = document.getElementById('safety-results');
+  if (safetyEl) {
+    let h = `<div style="font-size:9px;line-height:1.8;">`;
+    h += `<div style="font-weight:700;color:${safety.overallPass ? '#44cc66' : '#ff4444'};margin-bottom:2px;">`;
+    h += safety.overallPass ? '✓ ALL PASS' : '✗ SAFETY ISSUE';
+    h += ` <span style="color:#8899aa;font-weight:400;">(Req: CL≥${safety.req.clearance}mm, CR≥${safety.req.creepage}mm)</span></div>`;
+    safety.results.forEach(r => {
+      const sc = r.status === 'PASS' ? '#44cc66' : r.status === 'FAIL' ? '#ff4444' : r.status === 'N/A' ? '#8899aa' : '#e0a030';
+      h += `<div><span style="color:${sc};font-weight:600;width:36px;display:inline-block;">${r.status}</span> `;
+      h += `${r.name}`;
+      if (r.actual) h += ` — ${r.actual} / ${r.required}`;
+      if (r.note) h += ` <span style="color:#667788;">(${r.note})</span>`;
+      h += `</div>`;
+    });
+    h += `</div>`;
+    safetyEl.innerHTML = h;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// TRANSFORMER 3D VIEW (Three.js)
+// ══════════════════════════════════════════════════════════════
+
+const xf3d = (() => {
+  let scene, camera, renderer, controls;
+  let meshes = { core: [], bobbin: [], pri: [], sec: [], tape: [], dims: [], measure: [] };
+  let isTransparent = false, isExploded = false, isDimensions = false, isSection = false;
+  let isMMF = false, isCutView = false, isSkinDepth = false, isParasiticCp = false;
+  let isMeasuring = false, measurePt1 = null;
+  const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+  let measurePreviewLine = null, measurePreviewLabel = null;
+  let animId = null;
+  let dims = {};
+  let layerStack = [];
+  const raycaster = new THREE.Raycaster();
+  const mouseVec = new THREE.Vector2();
+
+  function init() {
+    const canvas = document.getElementById('xformer-canvas');
+    if (!canvas || typeof THREE === 'undefined') return;
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    resize();
+
+    camera = new THREE.PerspectiveCamera(40, canvas.clientWidth / canvas.clientHeight, 0.1, 500);
+    camera.position.set(20, 15, 25);
+
+    controls = new THREE.OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, 0, 0);
+
+    const amb = new THREE.AmbientLight(0xffffff, 0.5);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    dir.position.set(15, 20, 10);
+    const dir2 = new THREE.DirectionalLight(0x8888ff, 0.3);
+    dir2.position.set(-10, -5, -10);
+    scene.add(amb, dir, dir2);
+
+    const grid = new THREE.GridHelper(40, 20, 0x333355, 0x222244);
+    grid.position.y = -10;
+    scene.add(grid);
+
+    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('click', onMouseClick);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isMeasuring) {
+        if (measurePt1) {
+          if (meshes.measure.length > 0) {
+            const last = meshes.measure.pop();
+            scene.remove(last);
+            if (last.traverse) last.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+          }
+          measurePt1 = null;
+          clearMeasurePreview();
+        } else {
+          toggleMeasure();
+        }
+      }
+    });
+
+    animate();
+    window.addEventListener('resize', resize);
+  }
+
+  function resize() {
+    const canvas = document.getElementById('xformer-canvas');
+    if (!canvas || !renderer) return;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    renderer.setSize(w, h, false);
+    if (camera) { camera.aspect = w / h; camera.updateProjectionMatrix(); }
+  }
+
+  function animate() {
+    animId = requestAnimationFrame(animate);
+    if (controls) controls.update();
+    if (renderer && scene && camera) renderer.render(scene, camera);
+  }
+
+  function clearMeshes() {
+    Object.values(meshes).forEach(arr => {
+      arr.forEach(m => { scene.remove(m); if (m.geometry) m.geometry.dispose(); if (m.material) m.material.dispose(); });
+      arr.length = 0;
+    });
+  }
+
+  function box(w, h, d, color, opacity) {
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const mat = new THREE.MeshPhongMaterial({ color, transparent: opacity < 1, opacity, side: THREE.DoubleSide });
+    return new THREE.Mesh(geo, mat);
+  }
+
+  function buildCore(coreW, coreD, coreH, centerW, centerD, windowH, winW) {
+    const plateH = (coreH - windowH) / 2;
+    const legW = (coreW - centerW) / 2 - winW;
+    const color = 0x4a4a5a;
+    const group = [];
+
+    const top = box(coreW, plateH, coreD, color, 1);
+    top.position.set(0, windowH / 2 + plateH / 2, 0);
+    scene.add(top); group.push(top);
+
+    const bot = box(coreW, plateH, coreD, color, 1);
+    bot.position.set(0, -(windowH / 2 + plateH / 2), 0);
+    scene.add(bot); group.push(bot);
+
+    const cl = box(centerW, windowH, centerD, color, 1);
+    cl.position.set(0, 0, 0);
+    scene.add(cl); group.push(cl);
+
+    if (legW > 0.1) {
+      const ll = box(legW, windowH, coreD, color, 1);
+      ll.position.set(-(coreW / 2 - legW / 2), 0, 0);
+      scene.add(ll); group.push(ll);
+
+      const rl = box(legW, windowH, coreD, color, 1);
+      rl.position.set(coreW / 2 - legW / 2, 0, 0);
+      scene.add(rl); group.push(rl);
+    }
+
+    return group;
+  }
+
+  function buildBobbin(centerW, centerD, windowH, bobbinH, wall, flangeThk, numPins, pinPitch) {
+    const color = 0xcccccc;
+    const group = [];
+    const ft = flangeThk || 0.8;
+    const nPins = numPins || 8;
+    const pinsPerSide = Math.floor(nPins / 2);
+    const pp = pinPitch || 2.54;
+
+    const flangeW = centerW + wall * 2 + 2;
+    const flangeD = centerD + wall * 2 + 2;
+    const tf = box(flangeW, ft, flangeD, color, 0.6);
+    tf.position.set(0, bobbinH / 2 + ft / 2, 0);
+    scene.add(tf); group.push(tf);
+
+    const bf = box(flangeW, ft, flangeD, color, 0.6);
+    bf.position.set(0, -(bobbinH / 2 + ft / 2), 0);
+    scene.add(bf); group.push(bf);
+
+    const sides = [
+      { w: wall, h: bobbinH, d: centerD + wall * 2, x: (centerW / 2 + wall / 2), z: 0 },
+      { w: wall, h: bobbinH, d: centerD + wall * 2, x: -(centerW / 2 + wall / 2), z: 0 },
+      { w: centerW + wall * 2, h: bobbinH, d: wall, x: 0, z: (centerD / 2 + wall / 2) },
+      { w: centerW + wall * 2, h: bobbinH, d: wall, x: 0, z: -(centerD / 2 + wall / 2) },
+    ];
+    sides.forEach(s => {
+      const m = box(s.w, s.h, s.d, color, 0.4);
+      m.position.set(s.x, 0, s.z);
+      scene.add(m); group.push(m);
+    });
+
+    const pinGeo = new THREE.CylinderGeometry(0.15, 0.15, 2.5, 8);
+    const pinMat = new THREE.MeshPhongMaterial({ color: 0xccccaa, shininess: 80 });
+    const pinStartX = -(pinsPerSide - 1) * pp / 2;
+    for (let side = 0; side < 2; side++) {
+      const zSign = side === 0 ? 1 : -1;
+      const zPos = zSign * (centerD / 2 + wall + 0.5);
+      for (let i = 0; i < pinsPerSide; i++) {
+        const pin = new THREE.Mesh(pinGeo, pinMat);
+        pin.position.set(pinStartX + i * pp, -(bobbinH / 2 + ft + 1.2), zPos);
+        scene.add(pin); group.push(pin);
+      }
+    }
+
+    return group;
+  }
+
+  function buildWinding(innerW, innerD, thickness, windH, yOffset, color, opacity, meta) {
+    const group = [];
+    const hw = innerW / 2, hd = innerD / 2;
+    const ohw = hw + thickness, ohd = hd + thickness;
+    const r = Math.min(thickness * 1.5, ohw * 0.18, ohd * 0.18, 1.2);
+    const ri = Math.max(r * 0.3, 0.02);
+
+    function rrPath(p, w, h, cr) {
+      p.moveTo(-w + cr, -h);
+      p.lineTo(w - cr, -h);
+      p.quadraticCurveTo(w, -h, w, -h + cr);
+      p.lineTo(w, h - cr);
+      p.quadraticCurveTo(w, h, w - cr, h);
+      p.lineTo(-w + cr, h);
+      p.quadraticCurveTo(-w, h, -w, h - cr);
+      p.lineTo(-w, -h + cr);
+      p.quadraticCurveTo(-w, -h, -w + cr, -h);
+    }
+
+    const shape = new THREE.Shape();
+    rrPath(shape, ohw, ohd, r);
+    const hole = new THREE.Path();
+    rrPath(hole, hw, hd, ri);
+    shape.holes.push(hole);
+
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: windH, bevelEnabled: false, curveSegments: 8 });
+    geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshPhongMaterial({ color, transparent: opacity < 1, opacity, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.y = -windH / 2 + yOffset;
+    if (meta) mesh.userData.windingInfo = meta;
+    scene.add(mesh);
+    group.push(mesh);
+    return group;
+  }
+
+  class RRCurve3 extends THREE.Curve {
+    constructor(hw, hd, cr, y) {
+      super();
+      this.hw = hw; this.hd = hd;
+      this.cr = Math.min(Math.max(cr, 0.01), hw * 0.49, hd * 0.49);
+      this.y = y;
+      const sH = 2 * (hw - this.cr), sV = 2 * (hd - this.cr), arc = Math.PI * this.cr / 2;
+      this.totalLen = 2 * sH + 2 * sV + 4 * arc;
+    }
+    getPoint(t, target) {
+      const pt = target || new THREE.Vector3();
+      const hw = this.hw, hd = this.hd, cr = this.cr, y = this.y;
+      const sH = 2 * (hw - cr), sV = 2 * (hd - cr), arc = Math.PI * cr / 2;
+      let d = ((t % 1) + 1) % 1 * this.totalLen;
+      if (d <= sV) return pt.set(hw, y, -(hd - cr) + d);
+      d -= sV;
+      if (d <= arc) { const a = d / cr; return pt.set(hw - cr + cr * Math.cos(a), y, hd - cr + cr * Math.sin(a)); }
+      d -= arc;
+      if (d <= sH) return pt.set(hw - cr - d, y, hd);
+      d -= sH;
+      if (d <= arc) { const a = Math.PI / 2 + d / cr; return pt.set(-(hw - cr) + cr * Math.cos(a), y, hd - cr + cr * Math.sin(a)); }
+      d -= arc;
+      if (d <= sV) return pt.set(-hw, y, hd - cr - d);
+      d -= sV;
+      if (d <= arc) { const a = Math.PI + d / cr; return pt.set(-(hw - cr) + cr * Math.cos(a), y, -(hd - cr) + cr * Math.sin(a)); }
+      d -= arc;
+      if (d <= sH) return pt.set(-(hw - cr) + d, y, -hd);
+      d -= sH;
+      const a = 3 * Math.PI / 2 + d / cr;
+      return pt.set(hw - cr + cr * Math.cos(a), y, -(hd - cr) + cr * Math.sin(a));
+    }
+  }
+
+  function buildWindingWires(centerW, centerD, rStart, wireCoat, numTurns, numLayers, tpl, windH, color, opacity, meta) {
+    const group = [];
+    const wireR = wireCoat * 0.44;
+    const MAX_INDIVIDUAL = 200;
+    if (numTurns > MAX_INDIVIDUAL) {
+      const thk = numLayers * wireCoat;
+      return buildWinding(centerW + rStart * 2, centerD + rStart * 2, thk, windH, 0, color, opacity, meta);
+    }
+    let total = 0;
+    for (let layer = 0; layer < numLayers; layer++) {
+      const rCenter = rStart + layer * wireCoat + wireCoat / 2;
+      const pathHW = centerW / 2 + rCenter;
+      const pathHD = centerD / 2 + rCenter;
+      const cr = Math.min(rCenter * 0.5, pathHW * 0.2, pathHD * 0.2, 1.5);
+      const turnsInLayer = Math.min(tpl, numTurns - layer * tpl);
+      if (turnsInLayer <= 0) break;
+      for (let ti = 0; ti < turnsInLayer; ti++) {
+        if (total >= numTurns) break;
+        const yPos = -windH / 2 + (ti + 0.5) * wireCoat;
+        if (yPos + wireR > windH / 2 + 0.01) break;
+        const curve = new RRCurve3(pathHW, pathHD, Math.max(cr, 0.1), yPos);
+        const tubeGeo = new THREE.TubeGeometry(curve, 24, wireR, 6, true);
+        const mat = new THREE.MeshPhongMaterial({ color, transparent: opacity < 1, opacity, shininess: 60, specular: 0x333333 });
+        const mesh = new THREE.Mesh(tubeGeo, mat);
+        if (meta) mesh.userData.windingInfo = meta;
+        scene.add(mesh);
+        group.push(mesh);
+        total++;
+      }
+    }
+    return group;
+  }
+
+  function makeTextSprite(text, color) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const fontSize = 28;
+    ctx.font = `bold ${fontSize}px monospace`;
+    const tw = ctx.measureText(text).width;
+    canvas.width = tw + 12;
+    canvas.height = fontSize + 8;
+    ctx.font = `bold ${fontSize}px monospace`;
+    ctx.fillStyle = 'rgba(10,10,25,0.75)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = color || '#88ddff';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 6, canvas.height / 2);
+    const tex = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(canvas.width / 40, canvas.height / 40, 1);
+    return sprite;
+  }
+
+  function makeDimLine(p1, p2, offset, label, color) {
+    const grp = new THREE.Group();
+    const c = color || 0x88ddff;
+    const lineMat = new THREE.LineBasicMaterial({ color: c, depthTest: false });
+    const dir = new THREE.Vector3().subVectors(p2, p1).normalize();
+    const perp = offset.clone().normalize();
+    const e1 = p1.clone().add(offset);
+    const e2 = p2.clone().add(offset);
+    const tickLen = 0.3;
+    const tick1a = e1.clone().add(perp.clone().multiplyScalar(tickLen));
+    const tick1b = e1.clone().sub(perp.clone().multiplyScalar(tickLen));
+    const tick2a = e2.clone().add(perp.clone().multiplyScalar(tickLen));
+    const tick2b = e2.clone().sub(perp.clone().multiplyScalar(tickLen));
+
+    [
+      [p1, e1], [p2, e2], [e1, e2],
+      [tick1a, tick1b], [tick2a, tick2b]
+    ].forEach(([a, b]) => {
+      const geo = new THREE.BufferGeometry().setFromPoints([a, b]);
+      grp.add(new THREE.Line(geo, lineMat));
+    });
+
+    const sprite = makeTextSprite(label, '#' + new THREE.Color(c).getHexString());
+    const mid = new THREE.Vector3().lerpVectors(e1, e2, 0.5);
+    sprite.position.copy(mid.add(perp.clone().multiplyScalar(0.6)));
+    grp.add(sprite);
+    return grp;
+  }
+
+  function buildDimensions() {
+    meshes.dims.forEach(m => { scene.remove(m); });
+    meshes.dims.length = 0;
+    if (!isDimensions || !dims.coreW) return;
+
+    const d = dims;
+    const gap = 1.5;
+
+    // Core width — bottom
+    const cw = makeDimLine(
+      new THREE.Vector3(-d.coreW / 2, -d.coreH / 2, d.coreD / 2),
+      new THREE.Vector3(d.coreW / 2, -d.coreH / 2, d.coreD / 2),
+      new THREE.Vector3(0, -gap, 0),
+      d.coreW.toFixed(1) + 'mm'
+    );
+    scene.add(cw); meshes.dims.push(cw);
+
+    // Core height — right side
+    const ch = makeDimLine(
+      new THREE.Vector3(d.coreW / 2, -d.coreH / 2, d.coreD / 2),
+      new THREE.Vector3(d.coreW / 2, d.coreH / 2, d.coreD / 2),
+      new THREE.Vector3(gap, 0, 0),
+      d.coreH.toFixed(1) + 'mm'
+    );
+    scene.add(ch); meshes.dims.push(ch);
+
+    // Window width — inside, from center leg to outer leg
+    const winLeft = d.centerW / 2;
+    const winRight = winLeft + d.winW;
+    const wy = 0;
+    const ww = makeDimLine(
+      new THREE.Vector3(winLeft, wy, d.coreD / 2 + 0.5),
+      new THREE.Vector3(winRight, wy, d.coreD / 2 + 0.5),
+      new THREE.Vector3(0, 0, gap * 0.8),
+      d.winW.toFixed(1) + 'mm', 0x66aaff
+    );
+    scene.add(ww); meshes.dims.push(ww);
+
+    // Bobbin / winding height
+    const bh = makeDimLine(
+      new THREE.Vector3(-d.centerW / 2 - gap * 0.5, -d.bobbinH / 2, d.coreD / 2),
+      new THREE.Vector3(-d.centerW / 2 - gap * 0.5, d.bobbinH / 2, d.coreD / 2),
+      new THREE.Vector3(0, 0, gap * 0.6),
+      d.bobbinH.toFixed(1) + 'mm', 0xaaddaa
+    );
+    scene.add(bh); meshes.dims.push(bh);
+
+    // Winding build-up
+    if (d.usedR > 0) {
+      const buildY = d.windH / 2 + 0.5;
+      const bu = makeDimLine(
+        new THREE.Vector3(d.centerW / 2 + d.wall, buildY, d.coreD / 2 + 0.5),
+        new THREE.Vector3(d.centerW / 2 + d.wall + d.usedR, buildY, d.coreD / 2 + 0.5),
+        new THREE.Vector3(0, gap * 0.6, 0),
+        d.usedR.toFixed(2) + '/' + d.winW.toFixed(1) + 'mm (' + d.fillPct + '%)',
+        d.usedR > d.winW ? 0xff4444 : d.fillPct > 85 ? 0xe0a030 : 0x88ffaa
+      );
+      scene.add(bu); meshes.dims.push(bu);
+    }
+  }
+
+  function drawSection() {
+    const cv = document.getElementById('xf-section-canvas');
+    if (!cv) return;
+    cv.style.display = isSection ? 'block' : 'none';
+    if (!isSection || !dims.winW) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const cw = 300, ch = 380;
+    cv.width = cw * dpr; cv.height = ch * dpr;
+    cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+    const ctx = cv.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    ctx.fillStyle = 'rgba(15,15,30,0.95)';
+    ctx.fillRect(0, 0, cw, ch);
+
+    const d = dims;
+    const pad = { top: 30, bot: 60, left: 40, right: 20 };
+    const drawW = cw - pad.left - pad.right;
+    const drawH = ch - pad.top - pad.bot;
+    const scaleX = drawW / d.winW;
+    const scaleY = drawH / d.bobbinH;
+    const scale = Math.min(scaleX, scaleY);
+    const oX = pad.left + (drawW - d.winW * scale) / 2;
+    const oY = pad.top + (drawH - d.bobbinH * scale) / 2;
+
+    // Window outline
+    ctx.strokeStyle = '#556688';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(oX, oY, d.winW * scale, d.bobbinH * scale);
+
+    // Barrier zones (top/bottom)
+    const barrH = (d.barrier / 2) * scale;
+    ctx.fillStyle = 'rgba(255,100,150,0.15)';
+    ctx.fillRect(oX, oY, d.winW * scale, barrH);
+    ctx.fillRect(oX, oY + d.bobbinH * scale - barrH, d.winW * scale, barrH);
+    ctx.strokeStyle = 'rgba(255,100,150,0.4)';
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(oX, oY + barrH); ctx.lineTo(oX + d.winW * scale, oY + barrH);
+    ctx.moveTo(oX, oY + d.bobbinH * scale - barrH); ctx.lineTo(oX + d.winW * scale, oY + d.bobbinH * scale - barrH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Bobbin wall
+    const wallW = d.wall * scale;
+    ctx.fillStyle = 'rgba(180,180,180,0.2)';
+    ctx.fillRect(oX, oY, wallW, d.bobbinH * scale);
+
+    // Draw layers
+    let x = oX + wallW + 0.05 * scale;
+    const yTop = oY + barrH;
+    const layerH = d.windH * scale;
+
+    const fswHz = Math.max(parseFloat(document.getElementById('inp-fsw')?.value) || 60, 1) * 1e3;
+    const skinDepthMM = 1 / Math.sqrt(Math.PI * fswHz * 4 * Math.PI * 1e-7 * 5.8e7) * 1e3;
+
+    d.layers.forEach((l, layerIdx) => {
+      const lw = l.thk * scale;
+      if (l.isTape) {
+        ctx.fillStyle = l.color + '66';
+        ctx.fillRect(x, yTop, lw, layerH);
+        ctx.strokeStyle = 'rgba(232,200,64,0.5)';
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(x, yTop, lw, layerH);
+      } else {
+        const wireR = (l.wireD / 2) * scale;
+        const nLayers = l.layers || 1;
+        const tpl = l.tpl || Math.max(Math.floor(d.windH / Math.max(l.wireD, 0.01)), 1);
+        ctx.lineWidth = 0.5;
+        for (let li = 0; li < nLayers; li++) {
+          const cx = x + wireR + li * l.wireD * scale;
+          for (let ti = 0; ti < tpl; ti++) {
+            const cy = yTop + wireR + ti * l.wireD * scale;
+            if (cy + wireR > yTop + layerH + 0.5) break;
+            const r = wireR * 0.88;
+            if (isSkinDepth && l.wireD > 0) {
+              const ratio = (l.wireD / 2) / skinDepthMM;
+              if (ratio > 1) {
+                const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+                grad.addColorStop(0, 'rgba(30,50,100,0.6)');
+                grad.addColorStop(Math.max(1 - 1 / ratio, 0.2), 'rgba(60,130,220,0.7)');
+                grad.addColorStop(1, 'rgba(255,70,30,0.95)');
+                ctx.fillStyle = grad;
+              } else {
+                ctx.fillStyle = 'rgba(60,200,120,0.7)';
+              }
+              ctx.strokeStyle = ratio > 1 ? 'rgba(255,100,50,0.6)' : 'rgba(60,200,120,0.4)';
+            } else {
+              ctx.fillStyle = l.color + 'bb';
+              ctx.strokeStyle = l.color + '44';
+            }
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 0.6;
+        ctx.strokeRect(x, yTop, lw, layerH);
+      }
+      x += lw;
+    });
+
+    // Parasitic Capacitance overlay
+    if (isParasiticCp && d.layers.length > 1) {
+      const eps0 = 8.854e-12;
+      const epsR = 3.5;
+      let cpX = oX + wallW + 0.05 * scale;
+      for (let i = 0; i < d.layers.length; i++) {
+        const l1 = d.layers[i];
+        cpX += l1.thk * scale;
+        if (i >= d.layers.length - 1) break;
+        const l2 = d.layers[i + 1];
+        const hasTape = l1.isTape || l2.isTape;
+        if (!hasTape) continue;
+        const tapeLyr = l1.isTape ? l1 : l2;
+        const windLyr = l1.isTape ? (i > 0 ? d.layers[i - 1] : null) : l1;
+        if (!windLyr || windLyr.isTape) continue;
+        const r0 = tapeLyr.r0 || 0;
+        const mlt = (d.centerW + d.centerD) * 2 + r0 * 4;
+        const area = mlt * d.windH * 1e-6;
+        const dist = Math.max(tapeLyr.thk, 0.05) * 1e-3;
+        const cp = eps0 * epsR * area / dist * 1e12;
+        ctx.fillStyle = '#55ddff';
+        ctx.font = 'bold 7px monospace';
+        ctx.save();
+        ctx.translate(cpX - l1.thk * scale / 2, yTop + layerH / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.textAlign = 'center';
+        ctx.fillText(cp.toFixed(0) + 'pF', 0, -1);
+        ctx.restore();
+      }
+    }
+
+    // Overflow line
+    const maxX = oX + d.winW * scale;
+    if (x > maxX + 1) {
+      ctx.strokeStyle = '#ff4444';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(maxX, oY); ctx.lineTo(maxX, oY + d.bobbinH * scale); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Labels — title
+    ctx.fillStyle = '#aabbcc';
+    ctx.font = 'bold 11px monospace';
+    ctx.fillText('Winding Cross-Section', oX, oY - 10);
+
+    if (isSkinDepth) {
+      ctx.font = '8px monospace';
+      ctx.fillStyle = '#ff6644';
+      ctx.fillText('δ=' + skinDepthMM.toFixed(3) + 'mm @' + (fswHz/1e3).toFixed(0) + 'kHz', oX + 150, oY - 10);
+    }
+
+    // Labels — layer names (bottom)
+    ctx.font = '8px monospace';
+    let lx = oX + wallW + 0.05 * scale;
+    d.layers.forEach(l => {
+      const lw = l.thk * scale;
+      if (!l.isTape && lw > 8) {
+        ctx.save();
+        ctx.translate(lx + lw / 2, oY + d.bobbinH * scale + barrH + 12);
+        ctx.rotate(-Math.PI / 4);
+        ctx.fillStyle = l.color;
+        ctx.fillText(l.name + ' ' + l.layers + 'L', 0, 0);
+        ctx.restore();
+      }
+      lx += lw;
+    });
+
+    // Fill bar at bottom
+    const barY = ch - 18;
+    const barW = cw - 20;
+    const fillRatio = Math.min(d.usedR / d.winW, 1.3);
+    ctx.fillStyle = '#222233';
+    ctx.fillRect(10, barY, barW, 10);
+    const barColor = fillRatio > 1 ? '#ff4444' : fillRatio > 0.85 ? '#e0a030' : '#44cc66';
+    ctx.fillStyle = barColor;
+    ctx.fillRect(10, barY, barW * Math.min(fillRatio, 1), 10);
+    ctx.fillStyle = '#ddeeff';
+    ctx.font = 'bold 9px monospace';
+    ctx.fillText(d.usedR.toFixed(2) + ' / ' + d.winW.toFixed(1) + 'mm (' + d.fillPct + '%)', 12, barY - 3);
+  }
+
+  function toggleSection() {
+    isSection = !isSection;
+    document.getElementById('btn-xf-section').classList.toggle('active', isSection);
+    drawSection();
+  }
+
+  function toggleMMF() {
+    isMMF = !isMMF;
+    document.getElementById('btn-xf-mmf').classList.toggle('active', isMMF);
+    drawMMF();
+  }
+
+  function toggleSkinDepth() {
+    isSkinDepth = !isSkinDepth;
+    document.getElementById('btn-xf-skin').classList.toggle('active', isSkinDepth);
+    if (!isSection) { isSection = true; document.getElementById('btn-xf-section').classList.add('active'); }
+    drawSection();
+  }
+
+  function toggleParasiticCp() {
+    isParasiticCp = !isParasiticCp;
+    document.getElementById('btn-xf-cp').classList.toggle('active', isParasiticCp);
+    if (!isSection) { isSection = true; document.getElementById('btn-xf-section').classList.add('active'); }
+    drawSection();
+  }
+
+  function toggleCutView() {
+    isCutView = !isCutView;
+    document.getElementById('btn-xf-cut').classList.toggle('active', isCutView);
+    if (!renderer) return;
+    renderer.localClippingEnabled = isCutView;
+    const applyClip = (m) => {
+      if (m.material) {
+        m.material.clippingPlanes = isCutView ? [clipPlane] : [];
+        m.material.clipShadows = true;
+        m.material.needsUpdate = true;
+      }
+      if (m.traverse) m.traverse(c => {
+        if (c.material && c !== m) {
+          c.material.clippingPlanes = isCutView ? [clipPlane] : [];
+          c.material.clipShadows = true;
+          c.material.needsUpdate = true;
+        }
+      });
+    };
+    Object.values(meshes).forEach(arr => arr.forEach(applyClip));
+  }
+
+  function drawMMF() {
+    const cv = document.getElementById('xf-mmf-canvas');
+    if (!cv) return;
+    cv.style.display = isMMF ? 'block' : 'none';
+    if (!isMMF || !dims.layers || dims.layers.length === 0) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const cw = 300, ch = 200;
+    cv.width = cw * dpr; cv.height = ch * dpr;
+    cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+    const ctx = cv.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    ctx.fillStyle = 'rgba(15,15,30,0.95)';
+    ctx.fillRect(0, 0, cw, ch);
+
+    const d = dims;
+    const pad = { top: 25, bot: 25, left: 40, right: 15 };
+    const drawW = cw - pad.left - pad.right;
+    const drawH = ch - pad.top - pad.bot;
+
+    let cumTurns = 0, maxTurns = 0, totalR = 0;
+    const points = [{ x: 0, mmf: 0 }];
+
+    d.layers.forEach(l => {
+      if (l.isTape) {
+        points.push({ x: totalR + l.thk, mmf: cumTurns });
+        totalR += l.thk;
+      } else {
+        const isPri = l.name === 'Primary';
+        for (let li = 0; li < (l.layers || 1); li++) {
+          const lt = l.tpl || 1;
+          cumTurns += isPri ? lt : -lt;
+          totalR += l.wireD || 0;
+          points.push({ x: totalR, mmf: cumTurns });
+        }
+      }
+      maxTurns = Math.max(maxTurns, Math.abs(cumTurns));
+    });
+
+    if (maxTurns === 0) maxTurns = 1;
+    const maxR = totalR || 1;
+    const scX = drawW / maxR;
+    const scY = drawH / (maxTurns * 2);
+    const oX = pad.left, midY = pad.top + drawH / 2;
+
+    // Grid
+    ctx.strokeStyle = 'rgba(100,150,200,0.15)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(oX, midY); ctx.lineTo(oX + drawW, midY); ctx.stroke();
+    for (let i = 1; i <= 3; i++) {
+      const yOff = (drawH / 2) * (i / 3);
+      ctx.beginPath();
+      ctx.moveTo(oX, midY - yOff); ctx.lineTo(oX + drawW, midY - yOff);
+      ctx.moveTo(oX, midY + yOff); ctx.lineTo(oX + drawW, midY + yOff);
+      ctx.stroke();
+    }
+
+    // Layer boundaries
+    ctx.setLineDash([2, 2]);
+    let accR = 0;
+    d.layers.forEach(l => {
+      accR += l.thk;
+      ctx.strokeStyle = l.isTape ? 'rgba(232,200,64,0.3)' : 'rgba(150,200,255,0.15)';
+      ctx.beginPath();
+      ctx.moveTo(oX + accR * scX, pad.top); ctx.lineTo(oX + accR * scX, pad.top + drawH);
+      ctx.stroke();
+    });
+    ctx.setLineDash([]);
+
+    // MMF filled area
+    ctx.beginPath();
+    ctx.moveTo(oX, midY);
+    points.forEach(p => ctx.lineTo(oX + p.x * scX, midY - p.mmf * scY));
+    ctx.lineTo(oX + points[points.length - 1].x * scX, midY);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,100,68,0.12)';
+    ctx.fill();
+
+    // MMF curve
+    ctx.beginPath();
+    ctx.moveTo(oX + points[0].x * scX, midY - points[0].mmf * scY);
+    for (let i = 1; i < points.length; i++) ctx.lineTo(oX + points[i].x * scX, midY - points[i].mmf * scY);
+    ctx.strokeStyle = '#ff6644';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Peak marker
+    const peak = points.reduce((mx, p) => Math.abs(p.mmf) > Math.abs(mx.mmf) ? p : mx, points[0]);
+    const px = oX + peak.x * scX, py = midY - peak.mmf * scY;
+    ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#ff4444'; ctx.fill();
+    ctx.fillStyle = '#ff6644'; ctx.font = 'bold 8px monospace'; ctx.textAlign = 'left';
+    ctx.fillText('Peak: ' + Math.abs(peak.mmf) + ' AT', px + 5, py - 4);
+
+    // Titles
+    ctx.fillStyle = '#aabbcc'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'left';
+    ctx.fillText('MMF Distribution (NI)', oX, pad.top - 8);
+    ctx.save(); ctx.translate(10, midY); ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = '#778899'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('Ampere-Turns', 0, 0); ctx.restore();
+
+    // Y-axis values
+    ctx.fillStyle = '#667788'; ctx.font = '8px monospace'; ctx.textAlign = 'right';
+    ctx.fillText('+' + maxTurns, oX - 3, pad.top + 4);
+    ctx.fillText('0', oX - 3, midY + 3);
+    ctx.fillText('-' + maxTurns, oX - 3, pad.top + drawH + 4);
+
+    // Leakage energy indicator
+    let leakEnergy = 0;
+    for (let i = 1; i < points.length; i++) {
+      const dx = points[i].x - points[i - 1].x;
+      const avgMMF = (points[i].mmf + points[i - 1].mmf) / 2;
+      leakEnergy += avgMMF * avgMMF * dx;
+    }
+    ctx.fillStyle = '#998877'; ctx.font = '8px monospace'; ctx.textAlign = 'right';
+    ctx.fillText('∫MMF²·dr ∝ Llk: ' + leakEnergy.toFixed(0), cw - pad.right, ch - 5);
+  }
+
+  function getAllSceneMeshes() {
+    const out = [];
+    ['core','bobbin','pri','sec','tape'].forEach(k => {
+      meshes[k].forEach(m => { if (m.isMesh) out.push(m); m.traverse && m.traverse(c => { if (c.isMesh && c !== m) out.push(c); }); });
+    });
+    return out;
+  }
+
+  function clearMeasurePreview() {
+    if (measurePreviewLine) {
+      scene.remove(measurePreviewLine);
+      measurePreviewLine.geometry.dispose(); measurePreviewLine.material.dispose();
+      measurePreviewLine = null;
+    }
+    if (measurePreviewLabel) {
+      scene.remove(measurePreviewLabel);
+      if (measurePreviewLabel.material && measurePreviewLabel.material.map) measurePreviewLabel.material.map.dispose();
+      if (measurePreviewLabel.material) measurePreviewLabel.material.dispose();
+      measurePreviewLabel = null;
+    }
+  }
+
+  function onMouseMove(e) {
+    const canvas = renderer.domElement;
+    const rect = canvas.getBoundingClientRect();
+    mouseVec.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouseVec.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    if (isMeasuring) {
+      canvas.style.cursor = 'crosshair';
+      raycaster.setFromCamera(mouseVec, camera);
+      const hits = raycaster.intersectObjects(getAllSceneMeshes(), false);
+      if (measurePt1 && hits.length > 0) {
+        const endPt = hits[0].point;
+        clearMeasurePreview();
+        const geo = new THREE.BufferGeometry().setFromPoints([measurePt1, endPt]);
+        const mat = new THREE.LineDashedMaterial({ color: 0xff6644, dashSize: 0.3, gapSize: 0.15, depthTest: false });
+        measurePreviewLine = new THREE.Line(geo, mat);
+        measurePreviewLine.computeLineDistances();
+        measurePreviewLine.renderOrder = 999;
+        scene.add(measurePreviewLine);
+        const dist = measurePt1.distanceTo(endPt);
+        const mid = new THREE.Vector3().lerpVectors(measurePt1, endPt, 0.5);
+        measurePreviewLabel = makeTextSprite(dist.toFixed(2) + ' mm', '#ff6644');
+        measurePreviewLabel.position.copy(mid);
+        measurePreviewLabel.position.y += 0.4;
+        measurePreviewLabel.renderOrder = 999;
+        scene.add(measurePreviewLabel);
+      }
+      const tip = document.getElementById('xf-tooltip');
+      if (tip) tip.style.display = 'none';
+      return;
+    }
+
+    raycaster.setFromCamera(mouseVec, camera);
+    const hits = raycaster.intersectObjects(getAllSceneMeshes(), false);
+    const tip = document.getElementById('xf-tooltip');
+    if (!tip) return;
+
+    const hit = hits.find(h => h.object.userData.windingInfo);
+    if (hit) {
+      const info = hit.object.userData.windingInfo;
+      const bare = info.bareD ? info.bareD.toFixed(3) : '-';
+      const coat = info.coatD ? info.coatD.toFixed(3) : '-';
+      const mlt = info.mlt ? info.mlt.toFixed(1) : '-';
+      tip.innerHTML =
+        `<b style="color:${info.color || '#88ddff'}">${info.name}</b><br>` +
+        `Wire: <b>${bare}mm</b> bare → <b>${coat}mm</b> coated (${info.wireType || '-'})<br>` +
+        `Turns: <b>${info.turns || '-'}</b>  |  Layers: <b>${info.layers || '-'}</b>  |  TPL: <b>${info.tpl || '-'}</b><br>` +
+        `Build: <b>${info.thk ? info.thk.toFixed(2) : '-'}mm</b>  |  MLT: <b>${mlt}mm</b>`;
+      tip.style.display = 'block';
+      tip.style.left = (e.clientX - rect.left + 14) + 'px';
+      tip.style.top = (e.clientY - rect.top - 10) + 'px';
+      canvas.style.cursor = 'pointer';
+    } else {
+      tip.style.display = 'none';
+      canvas.style.cursor = 'grab';
+    }
+  }
+
+  function makeMeasureMarker(pt) {
+    const grp = new THREE.Group();
+    const sGeo = new THREE.SphereGeometry(0.12, 10, 10);
+    const sMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, depthTest: false });
+    const sphere = new THREE.Mesh(sGeo, sMat);
+    sphere.position.copy(pt);
+    sphere.renderOrder = 999;
+    grp.add(sphere);
+    const cs = 0.35;
+    [[1,0,0],[0,1,0],[0,0,1]].forEach(ax => {
+      const a = pt.clone().add(new THREE.Vector3(...ax).multiplyScalar(cs));
+      const b = pt.clone().sub(new THREE.Vector3(...ax).multiplyScalar(cs));
+      const g = new THREE.BufferGeometry().setFromPoints([a, b]);
+      const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x00ff88, depthTest: false }));
+      l.renderOrder = 999;
+      grp.add(l);
+    });
+    return grp;
+  }
+
+  function onMouseClick(e) {
+    if (!isMeasuring) return;
+    raycaster.setFromCamera(mouseVec, camera);
+    const hits = raycaster.intersectObjects(getAllSceneMeshes(), false);
+    if (hits.length === 0) return;
+
+    const pt = hits[0].point.clone();
+
+    if (!measurePt1) {
+      measurePt1 = pt;
+      const marker = makeMeasureMarker(pt);
+      scene.add(marker);
+      meshes.measure.push(marker);
+    } else {
+      clearMeasurePreview();
+      const grp = new THREE.Group();
+      grp.add(makeMeasureMarker(measurePt1));
+      grp.add(makeMeasureMarker(pt));
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([measurePt1, pt]);
+      const lineMat = new THREE.LineBasicMaterial({ color: 0x00ff88, depthTest: false });
+      const line = new THREE.Line(lineGeo, lineMat);
+      line.renderOrder = 998;
+      grp.add(line);
+      const dist = measurePt1.distanceTo(pt);
+      const mid = new THREE.Vector3().lerpVectors(measurePt1, pt, 0.5);
+      const label = makeTextSprite(dist.toFixed(2) + ' mm', '#00ff88');
+      label.position.copy(mid);
+      label.position.y += 0.4;
+      label.renderOrder = 999;
+      grp.add(label);
+      scene.add(grp);
+      if (meshes.measure.length > 0) {
+        const firstMarker = meshes.measure.pop();
+        scene.remove(firstMarker);
+        if (firstMarker.traverse) firstMarker.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+      }
+      meshes.measure.push(grp);
+      measurePt1 = null;
+    }
+  }
+
+  function toggleMeasure() {
+    isMeasuring = !isMeasuring;
+    measurePt1 = null;
+    clearMeasurePreview();
+    const btn = document.getElementById('btn-xf-measure');
+    if (btn) btn.classList.toggle('active', isMeasuring);
+    if (renderer) {
+      renderer.domElement.style.cursor = isMeasuring ? 'crosshair' : 'grab';
+    }
+    if (controls) controls.enableRotate = !isMeasuring;
+  }
+
+  function clearMeasurements() {
+    meshes.measure.forEach(m => {
+      scene.remove(m);
+      if (m.traverse) m.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+      if (m.geometry) m.geometry.dispose();
+      if (m.material) m.material.dispose();
+    });
+    meshes.measure.length = 0;
+    measurePt1 = null;
+  }
+
+  function exportPNG() {
+    if (!renderer) return;
+    renderer.render(scene, camera);
+    const link = document.createElement('a');
+    link.download = 'transformer-3d.png';
+    link.href = renderer.domElement.toDataURL('image/png');
+    link.click();
+  }
+
+  function autoFitCamera() {
+    if (!camera || !controls || !dims.coreW) return;
+    const maxDim = Math.max(dims.coreW, dims.coreH, dims.coreD);
+    const dist = maxDim * 2.2;
+    camera.position.set(dist * 0.7, dist * 0.5, dist * 0.85);
+    controls.target.set(0, 0, 0);
+    controls.update();
+  }
+
+  function update(core, Np, wireCoat, priLayers, channels, wireType, barrier, wireBare) {
+    if (!scene) return;
+    clearMeshes();
+
+    const bob = core.bobbin || {};
+    const bobbinH = core.bobbin_h || 10;
+    const winW = core.win_w || 4;
+    const centerW = bob.centerW || Math.sqrt(core.ae || 30) * 0.8;
+    const centerD = (core.ae || 30) / centerW;
+    const coreW = bob.coreW || (centerW + winW * 2 + 4);
+    const coreH = bob.coreH || (bobbinH + 4);
+    const coreD = centerD + 2;
+    const windowH = bobbinH;
+    const wall = bob.wall || 0.4;
+    const flangeThk = bob.flangeThk || 0.8;
+    const tapeThk = 0.15;
+    const halfBarrier = (barrier || 2) / 2;
+    const windH = bobbinH - halfBarrier * 2;
+
+    function calcMLT(iw, id, thk) { return 2 * (iw + thk) + 2 * (id + thk); }
+
+    meshes.core = buildCore(coreW, coreD, coreH, centerW, centerD, windowH, winW);
+    meshes.bobbin = buildBobbin(centerW, centerD, windowH, bobbinH, wall, flangeThk, bob.pins || 8, bob.pitch || 2.54);
+
+    let curR = wall + 0.05;
+    layerStack = [];
+    const priThk = priLayers * wireCoat;
+    const priTpl = Math.max(Math.floor(windH / Math.max(wireCoat, 0.01)), 1);
+    if (priThk > 0) {
+      const iw = centerW + curR * 2, id = centerD + curR * 2;
+      const priMeta = { name: 'Primary', bareD: wireBare || 0, coatD: wireCoat, wireType, turns: Np, layers: priLayers, tpl: priTpl, thk: priThk, mlt: calcMLT(iw, id, priThk), color: '#b87333' };
+      meshes.pri = buildWindingWires(centerW, centerD, curR, wireCoat, Np, priLayers, priTpl, windH, 0xb87333, 0.9, priMeta);
+      layerStack.push({ name: 'Primary', layers: priLayers, wireD: wireCoat, thk: priThk, r0: curR, color: '#b87333', tpl: priTpl });
+      curR += priThk;
+    }
+
+    meshes.tape.push(...buildWinding(centerW + curR * 2, centerD + curR * 2, tapeThk, windH, 0, 0xe8c840, 0.5));
+    layerStack.push({ name: 'Tape', layers: 1, wireD: tapeThk, thk: tapeThk, r0: curR, color: '#e8c840', isTape: true });
+    curR += tapeThk;
+
+    const secColors = [0x4488cc, 0x44aa66, 0xcc6644, 0x8866cc, 0xcc8844];
+    const secHex = ['#4488cc','#44aa66','#cc6644','#8866cc','#cc8844'];
+    channels.forEach((ch, i) => {
+      const chBare = ch.wireSize || ch.dia;
+      const chCoat = getWireCoat(chBare, wireType);
+      const ns = ch.ns || 10;
+      const tpl = Math.max(Math.floor(windH / Math.max(chCoat, 0.01)), 1);
+      const chLayers = Math.ceil(ns / tpl);
+      const chThk = chLayers * chCoat;
+
+      if (chThk > 0) {
+        const iw = centerW + curR * 2, id = centerD + curR * 2;
+        const chMeta = { name: ch.name || ('Sec' + (i+1)), bareD: chBare, coatD: chCoat, wireType, turns: ns, layers: chLayers, tpl, thk: chThk, mlt: calcMLT(iw, id, chThk), color: secHex[i % 5] };
+        meshes.sec.push(...buildWindingWires(centerW, centerD, curR, chCoat, ns, chLayers, tpl, windH, secColors[i % secColors.length], 0.85, chMeta));
+        layerStack.push({ name: ch.name || ('Sec' + (i+1)), layers: chLayers, wireD: chCoat, thk: chThk, r0: curR, color: secHex[i % 5], tpl });
+        curR += chThk;
+      }
+
+      if (i < channels.length - 1) {
+        meshes.tape.push(...buildWinding(centerW + curR * 2, centerD + curR * 2, tapeThk, windH, 0, 0xe8c840, 0.5));
+        layerStack.push({ name: 'Tape', layers: 1, wireD: tapeThk, thk: tapeThk, r0: curR, color: '#e8c840', isTape: true });
+        curR += tapeThk;
+      }
+    });
+
+    meshes.tape.push(...buildWinding(centerW + curR * 2, centerD + curR * 2, tapeThk, windH, 0, 0xe8c840, 0.5));
+    layerStack.push({ name: 'Tape', layers: 1, wireD: tapeThk, thk: tapeThk, r0: curR, color: '#e8c840', isTape: true });
+    curR += tapeThk;
+
+    // Update legend
+    const legendEl = document.getElementById('xformer-legend');
+    if (legendEl) {
+      let lh = '<div class="leg-item"><span class="leg-dot" style="background:#b87333"></span>Primary (' + priLayers + 'L)</div>';
+      channels.forEach((ch, i) => {
+        const c = ['#4488cc','#44aa66','#cc6644','#8866cc','#cc8844'][i % 5];
+        lh += `<div class="leg-item"><span class="leg-dot" style="background:${c}"></span>${ch.name} (Ns=${ch.ns||10})</div>`;
+      });
+      lh += '<div class="leg-item"><span class="leg-dot" style="background:#e8c840"></span>Insulation</div>';
+      legendEl.innerHTML = lh;
+    }
+
+    // Update info
+    const usedR = curR - wall - 0.05;
+    const fillPct = (usedR / winW * 100).toFixed(0);
+    const infoEl = document.getElementById('xformer-info');
+    if (infoEl) {
+      const status = usedR > winW ? '⚠ OVERFLOW' : fillPct > 85 ? '⚠ TIGHT' : '✓ OK';
+      const color = usedR > winW ? '#ff4444' : fillPct > 85 ? '#e0a030' : '#aaffaa';
+      const bob = core.bobbin || {};
+      infoEl.innerHTML = `<span style="color:${color}">${status}</span><br>Used: ${usedR.toFixed(2)}mm / ${winW.toFixed(1)}mm (${fillPct}%)<br>Core: ${core.name} (${core.material})` +
+        (bob.desc ? `<br>Bobbin: ${bob.desc} | Wall: ${wall}mm | Margin: ${bob.margin || '-'}mm` : '');
+    }
+
+    dims = { coreW, coreD, coreH, centerW, centerD, windowH, bobbinH, windH, winW, wall, usedR, fillPct, barrier: barrier || 2, layers: layerStack };
+    autoFitCamera();
+    buildDimensions();
+    drawSection();
+    drawMMF();
+    if (isCutView && renderer) {
+      renderer.localClippingEnabled = true;
+      Object.values(meshes).forEach(arr => arr.forEach(m => {
+        const apply = c => { if (c.material) { c.material.clippingPlanes = [clipPlane]; c.material.needsUpdate = true; } };
+        apply(m); if (m.traverse) m.traverse(apply);
+      }));
+    }
+  }
+
+  function toggleTransparent() {
+    isTransparent = !isTransparent;
+    document.getElementById('btn-xf-transparent').classList.toggle('active', isTransparent);
+    meshes.core.forEach(m => { m.material.transparent = true; m.material.opacity = isTransparent ? 0.15 : 1; });
+    meshes.bobbin.forEach(m => { m.material.transparent = true; m.material.opacity = isTransparent ? 0.1 : 0.5; });
+    meshes.pri.forEach(m => { m.material.transparent = true; m.material.opacity = isTransparent ? 0.35 : 0.9; });
+    meshes.sec.forEach(m => { m.material.transparent = true; m.material.opacity = isTransparent ? 0.4 : 0.85; });
+    meshes.tape.forEach(m => { m.material.transparent = true; m.material.opacity = isTransparent ? 0.15 : 0.5; });
+  }
+
+  function toggleExplode() {
+    isExploded = !isExploded;
+    document.getElementById('btn-xf-explode').classList.toggle('active', isExploded);
+    const off = isExploded ? 5 : 0;
+    meshes.core.forEach(m => {
+      if (m.position.y > 0) m.position.y += (isExploded ? off : -off);
+      if (m.position.y < 0) m.position.y -= (isExploded ? off : -off);
+    });
+    meshes.bobbin.forEach(m => {
+      if (Math.abs(m.position.y) > 3) {
+        if (m.position.y > 0) m.position.y += (isExploded ? off * 0.5 : -off * 0.5);
+        else m.position.y -= (isExploded ? off * 0.5 : -off * 0.5);
+      }
+    });
+  }
+
+  function resetCamera() {
+    autoFitCamera();
+  }
+
+  function toggleDimensions() {
+    isDimensions = !isDimensions;
+    document.getElementById('btn-xf-dims').classList.toggle('active', isDimensions);
+    buildDimensions();
+  }
+
+  return { init, update, resize, toggleTransparent, toggleExplode, toggleCutView, resetCamera, toggleDimensions, toggleSection, toggleMMF, toggleSkinDepth, toggleParasiticCp, toggleMeasure, clearMeasurements, exportPNG };
+})();
+
+let xf3dInited = false;
+function switchPage(id) {
+  document.getElementById('page1').style.display = id === 'page1' ? '' : 'none';
+  document.getElementById('page2').style.display = id === 'page2' ? '' : 'none';
+  document.querySelectorAll('.page-tab').forEach(t => t.classList.toggle('active', t.dataset.page === id));
+  if (id === 'page2') {
+    if (!xf3dInited) { xf3d.init(); xf3dInited = true; }
+    xf3d.resize && xf3d.resize();
+    updateAll();
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

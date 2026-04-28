@@ -1,6 +1,6 @@
 # DCM Flyback SMPS Transformer Designer — Project Status
 
-> **현재 버전: v0.02**
+> **현재 버전: v0.03**
 
 ## 프로젝트 개요
 
@@ -114,6 +114,15 @@ SMPS Design/
 ---
 
 ## Changelog
+
+### v0.03 (2026-04-29) — 3D View 분석 도구 보강
+
+- feat: MMF 분포 그래프 — 권선 레이어별 Ampere-Turn 누적 곡선 (좌하단 2D 오버레이)
+- feat: 3D 반단면 절단 (Cut) — THREE.Plane 클리핑으로 내부 권선 구조 노출
+- feat: Skin Depth 시각화 — 2D Section 와이어에 radial gradient (δ 대비 도체 크기 표시)
+- feat: 기생 커패시턴스 Cp 표시 — 테이프/권선 경계에 ε₀εrA/d 기반 pF 값 오버레이
+- feat: 툴바 확장 — Cut, MMF, Skin δ, Cp 버튼 4개 추가
+- docs: NotebookLM Deep Research 3건 결과 → docs/transformer_winding_references.md
 
 ### v0.02 (2026-04-28) — Wire DB 자동 연동
 

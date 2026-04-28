@@ -12,3 +12,6 @@ node_modules/
 test-results/
 playwright-report/
 ~$*.xlsx
+*.png
+.playwright-mcp/
+_working_state.md
