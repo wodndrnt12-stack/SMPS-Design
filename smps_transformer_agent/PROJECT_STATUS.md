@@ -1,6 +1,6 @@
 # DCM Flyback SMPS Transformer Designer — Project Status
 
-> **현재 버전: v0.01**
+> **현재 버전: v0.02**
 
 ## 프로젝트 개요
 
@@ -8,7 +8,7 @@
 - **기반**: `2026.02.10 EC PFC SMPS 회로설계 기준서.xlsx` — "2안" 시트
 - **구현**: **단일 HTML** (`index.html`, file:// 직접 실행)
 - **이유**: Streamlit → HTML 전환. file:// CORS 문제로 별도 JS/JSON 분리 불가
-- **테스트**: Playwright 56개 (Phase 1~4 전체 커버)
+- **테스트**: Playwright 66개 (Phase 1~4 + Wire DB 전체 커버)
 
 ---
 
@@ -57,6 +57,7 @@ SMPS Design/
 | IC_DB | BD7F100HFN (ROHM) | JS 상수 |
 | MOSFET_DB | STH3N150 (1500V/6Ω) | JS 상수 |
 | STEINMETZ | PC40/PC47 Steinmetz 계수 | JS 상수 |
+| WIRE_DB | 0.16~0.40φ 2UEW/TIW 피복 직경 10종 | JS 상수 |
 | userCores/userMosfets | 사용자 추가 부품 | localStorage |
 | Presets | 설계안 저장/비교 | localStorage |
 
@@ -113,6 +114,16 @@ SMPS Design/
 ---
 
 ## Changelog
+
+### v0.02 (2026-04-28) — Wire DB 자동 연동
+
+- feat: WIRE_DB 상수 추가 (0.16~0.40φ, 2UEW/TIW 피복 직경 10종)
+- feat: Wire Type(2UEW/TIW) + Wire Size 드롭다운 자동 연동
+- feat: Wire Table — Np/2차 채널별 와이어 규격 드롭다운 + Coat[mm] 컬럼
+- feat: 양방향 동기화 (Wire & Bobbin ↔ Wire Table Np)
+- feat: Window Utilization — 피복 직경 기반 계산으로 변경
+- feat: 프리셋 저장/복원에 wireType, wireSize 포함
+- test: Wire DB 테스트 10개 추가 (총 66개)
 
 ### v0.01 (2026-04-28) — 초기 통합 완료
 
@@ -196,7 +207,7 @@ SMPS Design/
 
 ---
 
-## Playwright 테스트 (56개)
+## Playwright 테스트 (66개)
 
 | 카테고리 | 수 | 내용 |
 |---------|---|------|
@@ -205,6 +216,7 @@ SMPS Design/
 | Phase 3 | 9 | Llk, P_snub, R/C, VDS clamped, Vclamp 경고 |
 | Phase 4 | 11 | Compare 모달, 프리셋 저장, 비교, 색상 코딩, 복원 |
 | Integration | 5 | 연쇄 계산, 채널 추가, Library 모달 |
+| Wire DB | 10 | 드롭다운, 자동연동, TIW/2UEW 전환, Np 동기화, maxTurns |
 
 실행: `npx playwright test`
 
@@ -224,7 +236,7 @@ SMPS Design/
 
 - [ ] 트랜스포머 구조 시트 — 권선 순서, 배리어 배치, 절연 구조
 - [ ] 절연거리 계산 — UL 61800 강화절연 (8mm) 등
-- [ ] 와이어 타입 선택 — 2UEW / TIW 구분
+- [x] 와이어 타입 선택 — 2UEW / TIW 구분 ✅ v0.02
 - [ ] 2D 트랜스포머 단면도 시각화
 - [ ] Multi-output 정밀 계산 — 크로스 레귤레이션 고려
 

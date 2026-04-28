@@ -550,3 +550,80 @@ test.describe('Integration — 연쇄 계산 검증', () => {
     expect(content).toContain('BD7F100HFN');
   });
 });
+
+// ════════════════════════════════════════════════════════════
+// Wire DB — 2UEW/TIW 자동 연동
+// ════════════════════════════════════════════════════════════
+
+test.describe('Wire DB — 2UEW/TIW 자동 연동', () => {
+  test('Wire Type 드롭다운 (2UEW/TIW) 존재', async ({ page }) => {
+    await expect(page.locator('#sel-wiretype')).toBeVisible();
+    const options = await page.locator('#sel-wiretype option').allTextContents();
+    expect(options).toContain('2UEW');
+    expect(options).toContain('TIW');
+  });
+
+  test('Wire Size 드롭다운 — 10개 규격 (0.16~0.40)', async ({ page }) => {
+    const count = await page.locator('#sel-wiresize option').count();
+    expect(count).toBe(10);
+  });
+
+  test('기본 0.20 선택 시 Bare=0.200, Coat=0.232 (2UEW)', async ({ page }) => {
+    const bare = await page.locator('#cal-wirebare').textContent();
+    expect(parseFloat(bare)).toBeCloseTo(0.200, 3);
+    const coat = await page.locator('#cal-wirecoat').textContent();
+    expect(parseFloat(coat)).toBeCloseTo(0.232, 3);
+  });
+
+  test('Wire Size 변경 → Bare/Coat 자동 업데이트', async ({ page }) => {
+    await page.locator('#sel-wiresize').selectOption('0.3');
+    await page.waitForTimeout(200);
+    const bare = await page.locator('#cal-wirebare').textContent();
+    expect(parseFloat(bare)).toBeCloseTo(0.300, 3);
+    const coat = await page.locator('#cal-wirecoat').textContent();
+    expect(parseFloat(coat)).toBeCloseTo(0.340, 3);
+  });
+
+  test('TIW 전환 → Coat 값 증가 (절연 두꺼움)', async ({ page }) => {
+    const coat2uew = parseFloat(await page.locator('#cal-wirecoat').textContent());
+    await page.locator('#sel-wiretype').selectOption('TIW');
+    await page.waitForTimeout(200);
+    const coatTiw = parseFloat(await page.locator('#cal-wirecoat').textContent());
+    expect(coatTiw).toBeGreaterThan(coat2uew);
+  });
+
+  test('TIW 0.20 → Coat=0.350', async ({ page }) => {
+    await page.locator('#sel-wiretype').selectOption('TIW');
+    await page.locator('#sel-wiresize').selectOption('0.2');
+    await page.waitForTimeout(200);
+    const coat = await page.locator('#cal-wirecoat').textContent();
+    expect(parseFloat(coat)).toBeCloseTo(0.350, 3);
+  });
+
+  test('Wire Table Np행 coat 열 표시', async ({ page }) => {
+    const coat = await page.locator('#ch-np-coat').textContent();
+    expect(parseFloat(coat)).toBeGreaterThan(0);
+  });
+
+  test('Wire Table 2차 채널 coat 열 표시', async ({ page }) => {
+    const coat = await page.locator('#ch-pv15-coat').textContent();
+    expect(parseFloat(coat)).toBeGreaterThan(0);
+  });
+
+  test('Wire Table Np 규격 변경 → Wire & Bobbin 동기화', async ({ page }) => {
+    await page.locator('#ch-np-wire').selectOption('0.25');
+    await page.waitForTimeout(200);
+    const selVal = await page.locator('#sel-wiresize').inputValue();
+    expect(selVal).toBe('0.25');
+    const bare = await page.locator('#cal-wirebare').textContent();
+    expect(parseFloat(bare)).toBeCloseTo(0.250, 3);
+  });
+
+  test('Wire Type 변경 → maxTurns 재계산 (coat 변경됨)', async ({ page }) => {
+    const turnsBefore = await page.locator('#cal-maxturns').textContent();
+    await page.locator('#sel-wiretype').selectOption('TIW');
+    await page.waitForTimeout(200);
+    const turnsAfter = await page.locator('#cal-maxturns').textContent();
+    expect(parseInt(turnsAfter)).toBeLessThan(parseInt(turnsBefore));
+  });
+});

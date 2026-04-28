@@ -323,7 +323,7 @@ table.cmp .cmp-grp td { background:var(--sub2) !important; color:#ddeeff; font-w
   <div id="hdr">
     <div class="brand">
       <div class="title">DCM Flyback Transformer Design</div>
-      <div class="sub">SMPS Design Tool · v0.01</div>
+      <div class="sub">SMPS Design Tool · v0.02</div>
     </div>
     <div class="divider"></div>
     <div class="meta" id="hdr-meta">EE2020 · 7.47W · 300~850V DC</div>
@@ -386,8 +386,10 @@ table.cmp .cmp-grp td { background:var(--sub2) !important; color:#ddeeff; font-w
               <tr class="th-col"><th>Parameter</th><th>Value</th><th>Unit</th><th>Note</th></tr>
             </thead>
             <tbody>
-              <tr><td class="td-lbl">1차측 Wire 직경</td>  <td class="td-inp"><input id="inp-wirebare" value="0.2"></td>  <td class="td-unit">mm</td><td class="td-note"></td></tr>
-              <tr><td class="td-lbl">피복포함 직경</td>    <td class="td-inp"><input id="inp-wirecoat" value="0.2"></td>   <td class="td-unit">mm</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">Wire Type</td><td class="td-inp"><select id="sel-wiretype" onchange="onWireChange()"><option value="2UEW">2UEW</option><option value="TIW">TIW</option></select></td><td class="td-unit">—</td><td class="td-note">전역 적용</td></tr>
+              <tr><td class="td-lbl">1차 Wire 규격</td><td class="td-inp"><select id="sel-wiresize" onchange="onWireChange()"></select></td><td class="td-unit">φ mm</td><td class="td-note">bare</td></tr>
+              <tr><td class="td-lbl">Bare 직경</td>        <td class="td-cal" id="cal-wirebare">0.200</td>                <td class="td-unit">mm</td><td class="td-note"></td></tr>
+              <tr><td class="td-lbl">피복포함 직경</td>    <td class="td-cal" id="cal-wirecoat">0.232</td>                 <td class="td-unit">mm</td><td class="td-note">auto</td></tr>
               <tr><td class="td-lbl">보빈 높이</td>        <td class="td-cal" id="cal-bobbinh2">12.4</td>                 <td class="td-unit">mm</td><td class="td-note">Core DB</td></tr>
               <tr><td class="td-lbl">배리어 높이</td>      <td class="td-inp"><input id="inp-barrier" value="2"></td>      <td class="td-unit">mm</td><td class="td-note"></td></tr>
               <tr><td class="td-lbl">권선가능 높이</td>    <td class="td-cal" id="cal-windingh">10.40</td>                 <td class="td-unit">mm</td><td class="td-note"></td></tr>
@@ -658,7 +660,7 @@ table.cmp .cmp-grp td { background:var(--sub2) !important; color:#ddeeff; font-w
           <thead>
             <tr>
               <th>Ch</th><th>Tab</th><th>Winding</th>
-              <th>Vo[V]</th><th>Iout[A]</th><th>Ns.set</th><th>Dia[mm]</th>
+              <th>Vo[V]</th><th>Iout[A]</th><th>Ns.set</th><th>Wire[φ]</th><th>Coat[mm]</th>
               <th>Ipk[A]</th><th>Irms[A]</th><th>Ns.cal</th><th>Vo.Cal[V]</th><th>Vrrm[V]</th>
               <th>SetA[mm²]</th><th>CalA[mm²]</th><th>Margin%</th><th></th>
             </tr>
@@ -747,6 +749,26 @@ const BSAT_DERATING = {
   "PC47": 0.0018,
 };
 
+// Wire DB: bare φ, 2UEW coated φ (JIS C 3202 Grade2), TIW coated φ (TEX-E 기준)
+const WIRE_DB = [
+  { bare:0.16, coat_2uew:0.189, coat_tiw:0.305 },
+  { bare:0.18, coat_2uew:0.210, coat_tiw:0.325 },
+  { bare:0.20, coat_2uew:0.232, coat_tiw:0.350 },
+  { bare:0.22, coat_2uew:0.253, coat_tiw:0.370 },
+  { bare:0.25, coat_2uew:0.285, coat_tiw:0.400 },
+  { bare:0.28, coat_2uew:0.316, coat_tiw:0.435 },
+  { bare:0.30, coat_2uew:0.340, coat_tiw:0.455 },
+  { bare:0.32, coat_2uew:0.360, coat_tiw:0.475 },
+  { bare:0.35, coat_2uew:0.391, coat_tiw:0.510 },
+  { bare:0.40, coat_2uew:0.443, coat_tiw:0.560 },
+];
+
+function getWireCoat(bare, type) {
+  const w = WIRE_DB.find(w => Math.abs(w.bare - bare) < 0.001);
+  if (!w) return bare;
+  return type === 'TIW' ? w.coat_tiw : w.coat_2uew;
+}
+
 const mu0 = 4 * Math.PI * 1e-7;
 
 // ── User custom DB (localStorage) ──
@@ -766,9 +788,9 @@ function getAllICs()     { return [...IC_DB, ...userICs]; }
 // ══════════════════════════════════════════════════════════════
 
 let secondaryChannels = [
-  { id:'pv15',  name:'PV15',  tab:'W4', winding:'6-7',   vo:15,  io:0.200, ns:10, dia:0.30 },
-  { id:'nv15',  name:'NV15',  tab:'W5', winding:'5-6',   vo:-15, io:0.010, ns:10, dia:0.30 },
-  { id:'ipv24', name:'IPV24', tab:'W3', winding:'10-11', vo:24,  io:0.180, ns:14, dia:0.30 },
+  { id:'pv15',  name:'PV15',  tab:'W4', winding:'6-7',   vo:15,  io:0.200, ns:10, dia:0.30, wireSize:0.30 },
+  { id:'nv15',  name:'NV15',  tab:'W5', winding:'5-6',   vo:-15, io:0.010, ns:10, dia:0.30, wireSize:0.30 },
+  { id:'ipv24', name:'IPV24', tab:'W3', winding:'10-11', vo:24,  io:0.180, ns:14, dia:0.30, wireSize:0.30 },
 ];
 let chCounter = 4;
 
@@ -854,6 +876,24 @@ function populateDropdowns() {
     mosSel.appendChild(opt);
   });
   mosSel.value = 'STH3N150';
+
+  const wireSel = document.getElementById('sel-wiresize');
+  wireSel.innerHTML = '';
+  WIRE_DB.forEach(w => {
+    const opt = document.createElement('option');
+    opt.value = w.bare; opt.textContent = w.bare.toFixed(2);
+    wireSel.appendChild(opt);
+  });
+  wireSel.value = '0.2';
+}
+
+function onWireChange() {
+  const type = document.getElementById('sel-wiretype').value;
+  const bare = parseFloat(document.getElementById('sel-wiresize').value);
+  const coat = getWireCoat(bare, type);
+  setText('cal-wirebare', bare.toFixed(3));
+  setText('cal-wirecoat', coat.toFixed(3));
+  updateAll();
 }
 
 function onCoreChange() {
@@ -883,14 +923,40 @@ function onMosfetChange() {
 // WIRE TABLE RENDERING
 // ══════════════════════════════════════════════════════════════
 
+function wireSelectHtml(id, selected) {
+  let html = `<select id="${id}" onchange="onWireTableSizeChange('${id}')">`;
+  WIRE_DB.forEach(w => {
+    const sel = Math.abs(w.bare - selected) < 0.001 ? ' selected' : '';
+    html += `<option value="${w.bare}"${sel}>${w.bare.toFixed(2)}</option>`;
+  });
+  return html + '</select>';
+}
+
+function onWireTableSizeChange(selId) {
+  const bare = parseFloat(document.getElementById(selId).value);
+  if (selId === 'ch-np-wire') {
+    document.getElementById('sel-wiresize').value = bare;
+    onWireChange();
+  } else {
+    const chId = selId.replace('ch-','').replace('-wire','');
+    const ch = secondaryChannels.find(c => c.id === chId);
+    if (ch) { ch.wireSize = bare; ch.dia = bare; }
+    updateAll();
+  }
+}
+
 function renderWireTable() {
   const tbody = document.getElementById('winding-tbody');
-  // Np row (always first)
+  const wireType = document.getElementById('sel-wiretype').value;
+  const priWire = parseFloat(document.getElementById('sel-wiresize').value) || 0.2;
+  const priCoat = getWireCoat(priWire, wireType);
+
   let html = `<tr id="ch-np">
     <td class="wch">Np</td><td>W1,W2</td><td>1-3</td>
     <td class="wcal">—</td><td class="wcal">—</td>
     <td class="wkey"><input id="ch-np-ns" value="${getVal('inp-np',90)}" onchange="setVal('inp-np',this.value);updateAll()"></td>
-    <td class="wui"><input id="ch-np-dia" value="0.2" onchange="updateAll()"></td>
+    <td class="wui">${wireSelectHtml('ch-np-wire', priWire)}</td>
+    <td class="wcal" id="ch-np-coat">${priCoat.toFixed(3)}</td>
     <td class="wcal" id="ch-np-ipk">—</td><td class="wcal" id="ch-np-irms">—</td>
     <td class="wcal" id="ch-np-nscal">—</td><td class="wcal">—</td><td class="wcal">—</td>
     <td class="wcal" id="ch-np-seta">—</td><td class="wcal" id="ch-np-cala">—</td>
@@ -898,6 +964,7 @@ function renderWireTable() {
   </tr>`;
 
   secondaryChannels.forEach(ch => {
+    const chCoat = getWireCoat(ch.wireSize || ch.dia, wireType);
     html += `<tr id="ch-${ch.id}">
       <td class="wch">${ch.name}</td>
       <td class="wui"><input value="${ch.tab}" style="width:40px" onchange="updateChField('${ch.id}','tab',this.value)"></td>
@@ -905,7 +972,8 @@ function renderWireTable() {
       <td class="wui"><input value="${ch.vo}" onchange="updateChField('${ch.id}','vo',parseFloat(this.value));updateAll()"></td>
       <td class="wui"><input value="${ch.io}" onchange="updateChField('${ch.id}','io',parseFloat(this.value));updateAll()"></td>
       <td class="wkey"><input value="${ch.ns}" onchange="updateChField('${ch.id}','ns',parseInt(this.value));updateAll()"></td>
-      <td class="wui"><input value="${ch.dia}" onchange="updateChField('${ch.id}','dia',parseFloat(this.value));updateAll()"></td>
+      <td class="wui">${wireSelectHtml('ch-'+ch.id+'-wire', ch.wireSize || ch.dia)}</td>
+      <td class="wcal" id="ch-${ch.id}-coat">${chCoat.toFixed(3)}</td>
       <td class="wcal" id="ch-${ch.id}-ipk">—</td>
       <td class="wcal" id="ch-${ch.id}-irms">—</td>
       <td class="wcal" id="ch-${ch.id}-nscal">—</td>
@@ -927,7 +995,7 @@ function updateChField(id, field, val) {
 
 function addChannel() {
   const id = 'ch' + chCounter++;
-  secondaryChannels.push({ id, name:'OUT'+chCounter, tab:'W?', winding:'?-?', vo:12, io:0.1, ns:5, dia:0.3 });
+  secondaryChannels.push({ id, name:'OUT'+chCounter, tab:'W?', winding:'?-?', vo:12, io:0.1, ns:5, dia:0.3, wireSize:0.30 });
   renderWireTable();
   updateAll();
 }
@@ -957,8 +1025,9 @@ function updateAll() {
   const Lp = Lp_set * 1e-6;
   const airgap = getVal('inp-airgap', 0.3);
   const BM_set = getVal('inp-bmset', 0.3);
-  const wireBare = getVal('inp-wirebare', 0.2);
-  const wireCoat = getVal('inp-wirecoat', 0.2);
+  const wireType = document.getElementById('sel-wiretype').value;
+  const wireBare = parseFloat(document.getElementById('sel-wiresize').value) || 0.2;
+  const wireCoat = getWireCoat(wireBare, wireType);
   const barrier = getVal('inp-barrier', 2);
   const jDensity = getVal('inp-jdensity', 7);
   const R_shunt = getVal('inp-rshunt', 1);
@@ -1122,7 +1191,10 @@ function updateAll() {
 
   // Window utilization
   const totalWireArea = Np * Math.PI * Math.pow(wireCoat/2, 2)
-    + secondaryChannels.reduce((s, ch) => s + (ch.ns || 10) * Math.PI * Math.pow(ch.dia/2, 2), 0);
+    + secondaryChannels.reduce((s, ch) => {
+      const chCoat = getWireCoat(ch.wireSize || ch.dia, wireType);
+      return s + (ch.ns || 10) * Math.PI * Math.pow(chCoat/2, 2);
+    }, 0);
   const windowArea = core.aw || 28;
   const winUtil = (totalWireArea / windowArea) * 100;
 
@@ -1385,6 +1457,8 @@ function getAllInputValues() {
   });
   inputs['sel-core'] = document.getElementById('sel-core').value;
   inputs['sel-mosfet'] = document.getElementById('sel-mosfet').value;
+  inputs['sel-wiretype'] = document.getElementById('sel-wiretype').value;
+  inputs['sel-wiresize'] = document.getElementById('sel-wiresize').value;
   inputs._channels = JSON.parse(JSON.stringify(secondaryChannels));
   return inputs;
 }
@@ -1403,6 +1477,7 @@ function setAllInputValues(data) {
   }
   onCoreChange();
   onMosfetChange();
+  onWireChange();
 }
 
 function loadPresets() {
@@ -1768,6 +1843,7 @@ function init() {
   // Initial calc
   onCoreChange();
   onMosfetChange();
+  onWireChange();
   updateAll();
 }
 
