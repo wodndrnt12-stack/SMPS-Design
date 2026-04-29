@@ -1,6 +1,6 @@
 # DCM Flyback SMPS Transformer Designer — Project Status
 
-> **현재 버전: v0.03**
+> **현재 버전: v0.04**
 
 ## 프로젝트 개요
 
@@ -115,7 +115,17 @@ SMPS Design/
 
 ## Changelog
 
-### v0.03 (2026-04-29) — 3D View 분석 도구 보강
+### v0.04 (2026-04-30) — STEP 3D 모델 통합 + PBR 재질
+
+- feat: STEP → GLB 변환 + base64 임베딩 (EE2020 코어, GLTFLoader.parse)
+- feat: STEP 3D 렌더링 — MeshPhongMaterial PBR 재질 (ferrite/copper/tin)
+- feat: vertex color 기반 파트 자동 감지 (코어 vs 권선 vs 핀)
+- feat: 3모드 순환 토글 (Off → STEP → Hybrid → Off)
+- feat: Hybrid 모드 — STEP 코어+핀 + 파라메트릭 권선 합성
+- fix: computeVertexNormals() + DoubleSide — 뒤집힌 노멀로 인한 검은 모델 수정
+- fix: polygonOffset z-fighting — 중첩 코어 메시 깜박임 해결
+
+### v0.03 (2026-04-29) — 3D View 분석 도구
 
 - feat: MMF 분포 그래프 — 권선 레이어별 Ampere-Turn 누적 곡선 (좌하단 2D 오버레이)
 - feat: 3D 반단면 절단 (Cut) — THREE.Plane 클리핑으로 내부 권선 구조 노출
